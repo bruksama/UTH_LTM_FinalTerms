@@ -52,30 +52,72 @@ public static class MessageHandler
 
     private static async Task<Message?> HandleRegisterAsync(RegisterMessage message, PeerRegistry peerRegistry, ILogger logger)
     {
+        await Task.Yield();
         // TODO: Implement registration logic
-        logger.LogInfo($"TODO: Handle Register message from {message.PeerInfo.Username}");
+       var ok = peerRegistry.RegisterPeer(message.PeerInfo);
+        logger.LogInfo(ok
+            ? $"Register OK: {message.PeerInfo.Username} ({message.PeerInfo.IpAddress}:{message.PeerInfo.ListenPort})"
+            : $"Register FAIL: {message.PeerInfo.Username}");
+
+        // Theo khuôn lớp message của bạn: ack trả về PeerId
         return new RegisterAckMessage { PeerId = message.PeerInfo.PeerId };
     }
 
     private static async Task<Message?> HandleQueryAsync(QueryMessage message, PeerRegistry peerRegistry, ILogger logger)
     {
         // TODO: Implement query logic
-        logger.LogInfo($"TODO: Handle Query message (filter: {message.FileNameFilter ?? "none"})");
-        return new QueryResponseMessage { Peers = peerRegistry.GetAllPeers() };
+        await Task.Yield();
+
+        var peers = string.IsNullOrWhiteSpace(message.FileNameFilter)
+            ? peerRegistry.GetAllPeers()
+            : peerRegistry.GetPeersWithFile(message.FileNameFilter!);
+
+        logger.LogInfo($"Query => {peers.Count} peers" +
+                       (string.IsNullOrWhiteSpace(message.FileNameFilter) ? "" : $" (filter='{message.FileNameFilter}')"));
+
+        return new QueryResponseMessage { Peers = peers };
     }
 
     private static async Task<Message?> HandleDeregisterAsync(DeregisterMessage message, PeerRegistry peerRegistry, ILogger logger)
     {
         // TODO: Implement deregistration logic
-        logger.LogInfo($"TODO: Handle Deregister message for peer {message.PeerId}");
+        await Task.Yield();
+
+        // Registry key là Username; message mang PeerId → map PeerId -> Username
+        var username = FindUsernameByPeerId(peerRegistry, message.PeerId);
+        if (username == null)
+        {
+            logger.LogInfo($"Deregister: PeerId '{message.PeerId}' not found (online)");
+            return null; // không cần response
+        }
+
+        var ok = peerRegistry.DeregisterPeer(username);
+        logger.LogInfo(ok ? $"Deregister OK: {username}" : $"Deregister NOT FOUND: {username}");
         return null;
     }
 
     private static async Task<Message?> HandleHeartbeatAsync(HeartbeatMessage message, PeerRegistry peerRegistry, ILogger logger)
     {
         // TODO: Update heartbeat
-        peerRegistry.UpdateHeartbeat(message.PeerId);
+        await Task.Yield();
+
+        var username = FindUsernameByPeerId(peerRegistry, message.PeerId);
+        if (username == null)
+        {
+            logger.LogDebug($"Heartbeat: PeerId '{message.PeerId}' not found (online)");
+            return null;
+        }
+
+        peerRegistry.UpdateHeartbeat(username);
+        logger.LogDebug($"Heartbeat OK: {username}");
         return null;
+    }
+     private static string? FindUsernameByPeerId(PeerRegistry registry, string peerId)
+    {
+        if (string.IsNullOrWhiteSpace(peerId)) return null;
+        // tra trong peers đang online (GetAllPeers đã lọc TTL)
+        var p = registry.GetAllPeers().FirstOrDefault(x => x.PeerId == peerId);
+        return p?.Username;
     }
 }
 
