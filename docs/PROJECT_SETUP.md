@@ -12,7 +12,8 @@ UTH_LTM_FinalTerms/
 ├── src/
 │   ├── P2PFileSharing.Common/     # ✅ Hoàn thành
 │   ├── P2PFileSharing.Server/     # ✅ Skeleton hoàn thành
-│   └── P2PFileSharing.Client/     # ✅ Skeleton hoàn thành
+│   ├── P2PFileSharing.Client/     # ✅ Skeleton hoàn thành
+│   └── P2PFileSharing.Client.GUI/ # ✅ GUI Skeleton hoàn thành
 ├── docs/                          # ✅ Tài liệu
 ├── .gitignore                     # ✅ Đã tạo
 ├── README.md                      # ✅ Đã tạo
@@ -78,6 +79,83 @@ UTH_LTM_FinalTerms/
 - ✅ `PerformanceMonitor.cs` - Performance metrics (TODO: implement FR-07)
 - ✅ `ConsoleUI.cs` - Console interface (TODO: implement FR-06)
 
+## P2PFileSharing.Client.GUI (Skeleton - Cần implement)
+
+### Cấu trúc MVVM:
+```
+P2PFileSharing.Client.GUI/
+├── Views/
+│   ├── MainWindow.xaml              # ✅ Skeleton - TODO: Implement layout
+│   ├── PeerItemControl.xaml         # ✅ Skeleton - TODO: Implement drag & drop
+│   └── TransferItemControl.xaml     # ✅ Skeleton - TODO: Implement transfer display
+├── ViewModels/
+│   ├── BaseViewModel.cs             # ✅ Hoàn thành - Base class với INotifyPropertyChanged
+│   ├── MainViewModel.cs             # ✅ Skeleton - TODO: Implement main UI logic
+│   ├── PeerViewModel.cs             # ✅ Skeleton - TODO: Implement peer display & file sending
+│   ├── SharedFileViewModel.cs       # ✅ Skeleton - TODO: Implement file info display
+│   ├── TransferViewModel.cs         # ✅ Skeleton - TODO: Implement transfer progress tracking
+│   └── RelayCommand.cs              # ✅ Hoàn thành - ICommand implementation
+└── Services/
+    ├── PeerClientService.cs         # ✅ Skeleton - TODO: Implement wrapper around PeerClient
+    └── UIService.cs                 # ✅ Skeleton - TODO: Implement dialogs & notifications
+```
+
+### Files đã tạo:
+- ✅ `MainWindow.xaml` - Main window với TODO comments
+- ✅ `MainWindow.xaml.cs` - Code-behind với TODO comments
+- ✅ `App.xaml` - Application definition
+- ✅ `P2PFileSharing.Client.GUI.csproj` - Project file với reference đến Common
+
+### Công việc cần làm (Thành viên 5 - GUI Development):
+
+**Phase 1: Setup và Integration**
+1. ✅ Tạo project structure (đã hoàn thành)
+2. ✅ Tạo ViewModels skeleton với TODO comments (đã hoàn thành)
+3. ✅ Tạo Views skeleton với TODO comments (đã hoàn thành)
+4. TODO: Thêm reference đến P2PFileSharing.Client project (hoặc copy business logic)
+5. TODO: Implement MainWindow.xaml layout với Grid/StackPanel
+6. TODO: Setup DataContext binding trong MainWindow.xaml.cs
+
+**Phase 2: ViewModels Implementation**
+1. TODO: Implement `MainViewModel.ConnectAsync()` - Kết nối với Server
+2. TODO: Implement `MainViewModel.RefreshPeersAsync()` - Load danh sách peer
+3. TODO: Implement `MainViewModel.ScanNetworkAsync()` - UDP scan
+4. TODO: Implement `PeerViewModel.SendFileAsync()` - Gửi file
+5. TODO: Implement `TransferViewModel` progress tracking
+6. TODO: Implement property change notifications và commands
+
+**Phase 3: Views Implementation**
+1. TODO: Design và implement MainWindow layout:
+   - Connection panel (Username, Server address, Connect button)
+   - Peer list area với ItemsControl
+   - Transfer queue panel
+   - Shared files panel
+2. TODO: Implement PeerItemControl với drag & drop:
+   - DragOver handler
+   - Drop handler
+   - Visual feedback khi drag over
+3. TODO: Implement TransferItemControl với progress bar
+4. TODO: Style UI với modern look
+
+**Phase 4: Drag & Drop Integration**
+1. TODO: Implement file drag & drop vào PeerItemControl
+2. TODO: Validate dropped files
+3. TODO: Trigger file transfer từ ViewModel
+4. TODO: Show transfer progress in real-time
+
+**Phase 5: Business Logic Integration**
+1. TODO: Integrate PeerClientService với PeerClient từ Client project
+2. TODO: Handle incoming file transfers và update UI
+3. TODO: Implement error handling và show notifications
+4. TODO: Implement file sharing management (add/remove shared files)
+
+**Phase 6: Polish & Testing**
+1. TODO: Add loading indicators
+2. TODO: Add error messages và user feedback
+3. TODO: Test drag & drop với multiple files
+4. TODO: Test file transfer progress display
+5. TODO: Style và UI polish
+
 ### Công việc cần làm:
 
 **Thành viên 3 (Client-Server Communication):**
@@ -97,6 +175,14 @@ UTH_LTM_FinalTerms/
 2. Implement `UdpDiscovery.StartListener()` - UDP listener
 3. Implement `ConsoleUI` commands - FR-06
 4. Implement `PerformanceMonitor` - FR-07
+5. **GUI Development (P2PFileSharing.Client.GUI):**
+   - Implement MVVM ViewModels (MainViewModel, PeerViewModel, TransferViewModel)
+   - Implement WPF Views (MainWindow layout, PeerItemControl, TransferItemControl)
+   - Implement drag & drop functionality for file transfer
+   - Integrate GUI with PeerClient business logic
+   - Implement file transfer progress tracking
+   - Implement peer list refresh and network scanning UI
+   - Style and polish UI
 
 ## Build Status
 
