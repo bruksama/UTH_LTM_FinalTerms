@@ -1,5 +1,7 @@
 using P2PFileSharing.Common.Configuration;
 using P2PFileSharing.Common.Infrastructure;
+using P2PFileSharing.Common.Models;
+using P2PFileSharing.Common.Utilities; 
 
 namespace P2PFileSharing.Client;
 
@@ -54,6 +56,35 @@ public class PeerClient
         // 3. Cleanup resources
 
         _logger.LogInfo("TODO: Stop client");
+    }
+    public async Task<List<PeerInfo>> ScanLanAsync()
+    {
+        try
+        {
+            if (_udpDiscovery.LocalPeerProvider == null)
+            {
+                _udpDiscovery.LocalPeerProvider = () => new PeerInfo
+                {
+                    Username   = Environment.UserName,
+                    IpAddress  = NetworkHelper.GetLocalIPAddress(),
+                    ListenPort = NetworkHelper.FindAvailablePort(5050, 5999),
+                    LastSeen   = DateTime.UtcNow,
+                    PeerId     = Guid.NewGuid().ToString()
+                };
+            }
+
+            _udpDiscovery.StartListener();
+
+            var peers = await _udpDiscovery.ScanNetworkAsync();
+            _logger.LogInfo($"ScanLanAsync: found {peers.Count} peer(s).");
+
+            return peers ?? new List<PeerInfo>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"ScanLanAsync failed: {ex.Message}", ex);
+            return new List<PeerInfo>();
+        }
     }
 
     public bool IsRunning => _isRunning;
