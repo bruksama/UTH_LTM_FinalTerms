@@ -66,11 +66,28 @@ public class RegistryServer
 
         try
         {
-            using (tcpClient)
+            try
             {
-                var stream = tcpClient.GetStream();
-                await MessageHandler.HandleMessagesAsync(stream, _peerRegistry, _logger);
+                tcpClient.NoDelay = true;
+                tcpClient.LingerState = new LingerOption(enable: false, seconds: 0);
             }
+            catch { /* bỏ qua nếu platform không hỗ trợ */ }
+            using (tcpClient)
+            using (var stream = tcpClient.GetStream())
+            {
+                await MessageHandler.HandleMessagesAsync(stream, _peerRegistry, _logger);
+                // TODO: Implement message handling using MessageHandler
+                // await MessageHandler.HandleMessagesAsync(stream, _peerRegistry, _logger);
+            }
+        }
+        catch (IOException ioex)
+        {
+        // Lỗi I/O do client đóng kết nối đột ngột là bình thường
+            _logger.LogDebug($"Client I/O closed: {clientEndPoint}. {ioex.Message}");
+        }
+        catch (ObjectDisposedException)
+        {
+            _logger.LogDebug($"Client stream disposed: {clientEndPoint}");
         }
         catch (Exception ex)
         {
