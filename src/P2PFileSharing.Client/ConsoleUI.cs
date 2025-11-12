@@ -102,6 +102,27 @@ public class ConsoleUI
     {
         // TODO: Scan network using UDP
         Console.WriteLine("TODO: Scan network");
+        var peers = await _client.ScanLanAsync();  // Sử dụng phương thức mới thêm vào PeerClient
+
+        if (peers == null || peers.Count == 0)
+        {
+            Console.WriteLine("No peers found.");
+            return;
+        }
+
+        Console.WriteLine($"Found {peers.Count} peer(s):");
+        int i = 1;
+        foreach (var peer in peers)
+        {
+            Console.WriteLine($"{i++}. {peer.Username}  {peer.IpAddress}:{peer.ListenPort}");
+            if (peer.SharedFiles?.Count > 0)
+            {
+                foreach (var f in peer.SharedFiles)
+                    Console.WriteLine($"     - {f.FileName} ({f.FileSize} bytes)");
+            }
+        }
+
+        _logger.LogInfo($"Scan completed: {peers.Count} peers discovered.");
     }
 
     private async Task HandleSendCommandAsync(string peerName, string fileName)
@@ -109,5 +130,6 @@ public class ConsoleUI
         // TODO: Send file to peer
         Console.WriteLine($"TODO: Send {fileName} to {peerName}");
     }
+
 }
 
