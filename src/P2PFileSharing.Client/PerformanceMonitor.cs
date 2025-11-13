@@ -4,7 +4,6 @@ namespace P2PFileSharing.Client;
 
 /// <summary>
 /// Đo lường hiệu năng truyền file (FR-07)
-/// TODO: Implement performance metrics tracking
 /// </summary>
 public class PerformanceMonitor
 {
@@ -20,9 +19,14 @@ public class PerformanceMonitor
     /// </summary>
     public TransferMetrics StartMonitoring(string transferId)
     {
-        // TODO: Create metrics object và start tracking
-        _logger.LogDebug($"TODO: Start monitoring transfer {transferId}");
-        return new TransferMetrics { TransferId = transferId };
+        var metrics = new TransferMetrics
+        {
+            TransferId = transferId,
+            StartTime = DateTime.UtcNow
+        };
+
+        _logger.LogDebug($"[Perf] Start monitoring transfer {transferId}");
+        return metrics;
     }
 
     /// <summary>
@@ -30,10 +34,22 @@ public class PerformanceMonitor
     /// </summary>
     public void UpdateMetrics(TransferMetrics metrics, long bytesTransferred, TimeSpan elapsed)
     {
-        // TODO: Calculate throughput, update metrics
         metrics.BytesTransferred = bytesTransferred;
         metrics.ElapsedTime = elapsed;
-        metrics.ThroughputMBps = bytesTransferred / elapsed.TotalSeconds / (1024 * 1024);
+
+        var seconds = elapsed.TotalSeconds;
+        if (seconds <= 0)
+        {
+            metrics.ThroughputMBps = 0;
+            return;
+        }
+
+        metrics.ThroughputMBps = bytesTransferred / seconds / (1024 * 1024.0);
+
+        _logger.LogDebug(
+            $"[Perf] {metrics.TransferId}: " +
+            $"{bytesTransferred} bytes in {seconds:F2}s " +
+            $"({metrics.ThroughputMBps:F2} MB/s)");
     }
 
     /// <summary>
@@ -41,8 +57,10 @@ public class PerformanceMonitor
     /// </summary>
     public void StopMonitoring(TransferMetrics metrics)
     {
-        // TODO: Finalize metrics và log
-        _logger.LogInfo($"TODO: Transfer {metrics.TransferId} completed: {metrics.ThroughputMBps:F2} MB/s");
+        _logger.LogInfo(
+            $"[Perf] Transfer {metrics.TransferId} completed: " +
+            $"{metrics.BytesTransferred} bytes in {metrics.ElapsedTime.TotalSeconds:F2}s, " +
+            $"avg {metrics.ThroughputMBps:F2} MB/s");
     }
 }
 
@@ -54,8 +72,12 @@ public class TransferMetrics
     public string TransferId { get; set; } = string.Empty;
     public long BytesTransferred { get; set; }
     public TimeSpan ElapsedTime { get; set; }
+
     public double ThroughputMBps { get; set; }
+
+    // Thêm để sau này có thể dùng nếu cần
+    public DateTime StartTime { get; set; }
+
     public double CpuUsage { get; set; }
     public long MemoryUsage { get; set; }
 }
-
