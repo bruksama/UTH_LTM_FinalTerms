@@ -126,14 +126,71 @@ public class ServerCommunicator
     /// </summary>
     public async Task<List<PeerInfo>> QueryPeersAsync(string? fileNameFilter = null)
     {
-        // TODO: Implement query
-        // 1. Connect to server
-        // 2. Send QueryMessage
-        // 3. Receive QueryResponseMessage
-        // 4. Return list of peers
-        _logger.LogInfo($"TODO: Query peers from server (filter: {fileNameFilter ?? "none"})");
-        await Task.CompletedTask;
-        return new List<PeerInfo>();
+        try
+        {
+            using var client = new System.Net.Sockets.TcpClient();
+
+            var timeoutMs = (int)P2PFileSharing.Common.Protocol.ProtocolConstants.ConnectionTimeout.TotalMilliseconds;
+            var cts = new CancellationTokenSource(timeoutMs);
+
+            _logger.LogInfo($"Connecting to server {_config.ServerIpAddress}:{_config.ServerPort} to query peers...");
+
+            var connectTask = client.ConnectAsync(_config.ServerIpAddress, _config.ServerPort);
+            var timeoutTask = Task.Delay(timeoutMs, cts.Token);
+            var completed = await Task.WhenAny(connectTask, timeoutTask);
+
+            if (completed == timeoutTask || !client.Connected)
+            {
+                var errorMsg = completed == timeoutTask
+                    ? $"Connection timeout after {timeoutMs}ms"
+                    : "Connection failed";
+                _logger.LogInfo($"QueryPeers: {errorMsg} - Cannot connect to server {_config.ServerIpAddress}:{_config.ServerPort}");
+                _logger.LogInfo($"  Hãy kiểm tra:");
+                _logger.LogInfo($"  1. Server đã được khởi động chưa?");
+                _logger.LogInfo($"  2. IP address và port có đúng không?");
+                _logger.LogInfo($"  3. Firewall có chặn kết nối không?");
+                _logger.LogInfo($"  4. Cả hai máy có cùng mạng LAN không?");
+                return new List<PeerInfo>();
+            }
+
+            using var stream = client.GetStream();
+
+            client.SendTimeout = (int)P2PFileSharing.Common.Protocol.ProtocolConstants.ReadWriteTimeout.TotalMilliseconds;
+            client.ReceiveTimeout = (int)P2PFileSharing.Common.Protocol.ProtocolConstants.ReadWriteTimeout.TotalMilliseconds;
+
+            var queryMessage = new QueryMessage
+            {
+                FileNameFilter = fileNameFilter
+            };
+
+            await P2PFileSharing.Common.Protocol.MessageSerializer.SendMessageAsync(stream, queryMessage, cts.Token);
+
+            var response = await P2PFileSharing.Common.Protocol.MessageSerializer.ReceiveMessageAsync(stream, cts.Token);
+            if (response == null)
+            {
+                _logger.LogInfo("QueryPeers: no response from server");
+                return new List<PeerInfo>();
+            }
+
+            if (response is QueryResponseMessage qrm)
+            {
+                _logger.LogInfo($"QueryPeers: received {qrm.TotalPeers} peers" + (string.IsNullOrWhiteSpace(fileNameFilter) ? string.Empty : $" (filter='{fileNameFilter}')"));
+                return qrm.Peers ?? new List<PeerInfo>();
+            }
+
+            _logger.LogInfo($"QueryPeers: unexpected response type: {response.GetType().Name}");
+            return new List<PeerInfo>();
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInfo("QueryPeers: connection timed out");
+            return new List<PeerInfo>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("QueryPeers failed", ex);
+            return new List<PeerInfo>();
+        }
     }
 
     /// <summary>

@@ -12,7 +12,8 @@ public static class MessageSerializer
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        WriteIndented = false
+        WriteIndented = false,
+        PropertyNameCaseInsensitive = true
     };
 
     /// <summary>
@@ -23,14 +24,21 @@ public static class MessageSerializer
         if (message == null)
             throw new ArgumentNullException(nameof(message));
 
-        // Tạo wrapper object chứa type và data
-        var wrapper = new
-        {
-            Type = message.Type.ToString(),
-            Data = message
-        };
+        // Serialize message using its runtime type to include derived properties
+        var dataJson = JsonSerializer.Serialize(message, message.GetType(), JsonOptions);
 
-        return JsonSerializer.Serialize(wrapper, JsonOptions);
+        // Build wrapper json: { "type": "...", "data": { ... } }
+        using var ms = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(ms))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("type", message.Type.ToString());
+            writer.WritePropertyName("data");
+            using var doc = JsonDocument.Parse(dataJson);
+            doc.RootElement.WriteTo(writer);
+            writer.WriteEndObject();
+        }
+        return Encoding.UTF8.GetString(ms.ToArray());
     }
 
     /// <summary>
