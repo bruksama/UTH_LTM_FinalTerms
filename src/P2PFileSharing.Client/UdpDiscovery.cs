@@ -11,13 +11,16 @@ namespace P2PFileSharing.Client;
 
 /// <summary>
 /// UDP Broadcast discovery để tìm peers trong LAN (FR-02)
-/// TODO: Implement UDP broadcast sender và listener
 /// </summary>
 public class UdpDiscovery
 {
     private const int DefaultDiscoveryPort = 9999;
     private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(3);
-    private static readonly JsonSerializerOptions JsonOpt = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+    private static readonly JsonSerializerOptions JsonOpt = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
     private readonly ClientConfig _config;
     private readonly ILogger _logger;
 
@@ -55,8 +58,10 @@ public class UdpDiscovery
     /// </summary>
     public async Task<List<PeerInfo>> ScanNetworkAsync()
     {
-        const int discoveryPort = 9999;
-        var timeout = TimeSpan.FromSeconds(3);
+        
+        var discoveryPort = DiscoveryPort;
+        var timeout = Timeout;
+
         var results = new List<PeerInfo>();
         var dedup = new HashSet<string>();
 
@@ -68,13 +73,14 @@ public class UdpDiscovery
 
             // 1) Send broadcast packet
             var probeBytes = Encoding.UTF8.GetBytes("DISCOVER_P2P_V1?");
-            var broadcast = new IPEndPoint(IPAddress.Broadcast, discoveryPort);
+            var bcIp = IPAddress.Parse(NetworkHelper.GetBroadcastAddress());
+            var broadcast = new IPEndPoint(bcIp, discoveryPort);
 
             await udp.SendAsync(probeBytes, probeBytes.Length, broadcast);
             await Task.Delay(120); // slight delay to allow responses to arrive
             await udp.SendAsync(probeBytes, probeBytes.Length, broadcast);
 
-            _logger.LogInfo($"UDP broadcast sent to *:{discoveryPort}. Waiting for replies...");
+            _logger.LogInfo($"UDP broadcast sent to {bcIp}:{discoveryPort}. Waiting for replies...");
 
             // 2) Listen for responses
             var start = DateTime.UtcNow;
@@ -92,10 +98,7 @@ public class UdpDiscovery
                     if (!text.StartsWith("PEER:", StringComparison.Ordinal)) continue;
 
                     var json = text["PEER:".Length..];
-                    var peer = JsonSerializer.Deserialize<PeerInfo>(json, new JsonSerializerOptions
-                    {
-                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                    });
+                    var peer = JsonSerializer.Deserialize<PeerInfo>(json, JsonOpt);
                     if (peer == null) continue;
 
                     // Nếu IpAddress rỗng, gán IP của responder
@@ -117,7 +120,7 @@ public class UdpDiscovery
         }
         catch (Exception ex)
         {
-            _logger.LogError($"UDP scan error: {ex.Message}");
+            _logger.LogError($"UDP scan error: {ex.Message}", ex);
         }
 
         // 4) Return list of discovered peers
@@ -131,6 +134,7 @@ public class UdpDiscovery
     public void StartListener()
     {
         if (_listenerTask != null) return;
+
         _listenerCts = new CancellationTokenSource();
         _listenerUdp = new UdpClient(new IPEndPoint(IPAddress.Any, DiscoveryPort));
         _listenerTask = Task.Run(() => ListenLoopAsync(_listenerUdp, _listenerCts.Token));
@@ -149,7 +153,10 @@ public class UdpDiscovery
             _listenerUdp?.Close();
             _listenerUdp?.Dispose();
         }
-        catch { /* ignore */ }
+        catch
+        {
+            // ignore
+        }
         finally
         {
             _listenerUdp = null;
@@ -158,6 +165,7 @@ public class UdpDiscovery
         }
         _logger.LogInfo("UDP discovery listener stopped");
     }
+
     private async Task ListenLoopAsync(UdpClient udp, CancellationToken ct)
     {
         while (!ct.IsCancellationRequested)
@@ -179,20 +187,17 @@ public class UdpDiscovery
                 var peer = provider();
 
                 if (string.IsNullOrWhiteSpace(peer.IpAddress))
-                    peer.IpAddress = NetworkHelper.GetLocalIPAddress() ?? "127.0.0.1";
+                    peer.IpAddress = NetworkHelper.GetLocalIPAddress();
 
-                var json = JsonSerializer.Serialize(peer, new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                });
+                var json = JsonSerializer.Serialize(peer, JsonOpt);
 
                 var payload = Encoding.UTF8.GetBytes("PEER:" + json);
                 await udp.SendAsync(payload, payload.Length, res.RemoteEndPoint);
             }
-            catch { /* ignore packet error */ }
+            catch
+            {
+                // ignore packet error
+            }
         }
     }
-
-
 }
-
