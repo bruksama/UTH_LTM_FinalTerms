@@ -1,13 +1,13 @@
 using P2PFileSharing.Common.Configuration;
 using P2PFileSharing.Common.Infrastructure;
 using P2PFileSharing.Common.Models;
-using P2PFileSharing.Common.Utilities;
+using P2PFileSharing.Common.Utilities; 
 
 namespace P2PFileSharing.Client;
 
 /// <summary>
 /// Main client class - quản lý peer client
-/// TODO: Implement client lifecycle và coordination giữa các components (phần server, P2P listener, heartbeat cho member khác)
+/// TODO: Implement client lifecycle và coordination giữa các components
 /// </summary>
 public class PeerClient
 {
@@ -32,29 +32,15 @@ public class PeerClient
     /// </summary>
     public async Task StartAsync()
     {
-        if (_isRunning) return;
-
         _isRunning = true;
 
-        // TODO: 1. Register with server via _serverCommunicator
-        // TODO: 2. Start P2P listener (FileTransferManager)
-        // TODO: 3. Start heartbeat task
-        
-        if (_udpDiscovery.LocalPeerProvider == null)
-        {
-            _udpDiscovery.LocalPeerProvider = () => new PeerInfo
-            {
-                Username   = Environment.UserName,
-                IpAddress  = NetworkHelper.GetLocalIPAddress(),
-                ListenPort = NetworkHelper.FindAvailablePort(5050, 5999),
-                LastSeen   = DateTime.UtcNow,
-                PeerId     = Guid.NewGuid().ToString()
-            };
-        }
-        
-        _udpDiscovery.StartListener();
+        // TODO: Implement startup sequence
+        // 1. Register with server
+        // 2. Start P2P listener
+        // 3. Start UDP discovery listener
+        // 4. Start heartbeat task
 
-        _logger.LogInfo("PeerClient started (discovery listener running; server registration TODO).");
+        _logger.LogInfo("TODO: Start client");
         await Task.CompletedTask;
     }
 
@@ -63,23 +49,16 @@ public class PeerClient
     /// </summary>
     public async Task StopAsync()
     {
-        if (!_isRunning) return;
-
         _isRunning = false;
 
-        // TODO: 1. Deregister from server
-        // TODO: 2. Stop P2P listener
-        // TODO: 3. Cleanup other resources
+        // TODO: Implement shutdown sequence
+        // 1. Deregister from server
+        // 2. Stop all listeners
+        // 3. Cleanup resources
 
-        _udpDiscovery.StopListener();
-
-        _logger.LogInfo("PeerClient stopped.");
+        _logger.LogInfo("TODO: Stop client");
         await Task.CompletedTask;
     }
-
-    /// <summary>
-    /// Quét LAN bằng UDP discovery để tìm các peers đang online.
-    /// </summary>
     public async Task<List<PeerInfo>> ScanLanAsync()
     {
         try
@@ -95,7 +74,7 @@ public class PeerClient
                     PeerId     = Guid.NewGuid().ToString()
                 };
             }
-            
+
             _udpDiscovery.StartListener();
 
             var peers = await _udpDiscovery.ScanNetworkAsync();
@@ -112,3 +91,4 @@ public class PeerClient
 
     public bool IsRunning => _isRunning;
 }
+
