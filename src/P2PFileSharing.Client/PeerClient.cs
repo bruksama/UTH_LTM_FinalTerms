@@ -1,13 +1,13 @@
 using P2PFileSharing.Common.Configuration;
 using P2PFileSharing.Common.Infrastructure;
 using P2PFileSharing.Common.Models;
-using P2PFileSharing.Common.Utilities; 
+using P2PFileSharing.Common.Utilities;
 
 namespace P2PFileSharing.Client;
 
 /// <summary>
 /// Main client class - quản lý peer client
-/// TODO: Implement client lifecycle và coordination giữa các components
+/// TODO: Implement client lifecycle và coordination giữa các components (phần server, P2P listener, heartbeat cho member khác)
 /// </summary>
 public class PeerClient
 {
@@ -29,18 +29,36 @@ public class PeerClient
 
     /// <summary>
     /// Start client - đăng ký với server, start listeners
+    /// (ở đây: mày chỉ khởi động phần discovery để test LAN trước,
+    /// còn register server, P2P listener, heartbeat để TODO cho member khác)
     /// </summary>
     public async Task StartAsync()
     {
+        if (_isRunning) return;
+
         _isRunning = true;
 
-        // TODO: Implement startup sequence
-        // 1. Register with server
-        // 2. Start P2P listener
-        // 3. Start UDP discovery listener
-        // 4. Start heartbeat task
+        // TODO: 1. Register with server via _serverCommunicator
+        // TODO: 2. Start P2P listener (FileTransferManager)
+        // TODO: 3. Start heartbeat task
 
-        _logger.LogInfo("TODO: Start client");
+        // Chuẩn bị LocalPeerProvider nếu chưa có
+        if (_udpDiscovery.LocalPeerProvider == null)
+        {
+            _udpDiscovery.LocalPeerProvider = () => new PeerInfo
+            {
+                Username   = Environment.UserName,
+                IpAddress  = NetworkHelper.GetLocalIPAddress(),
+                ListenPort = NetworkHelper.FindAvailablePort(5050, 5999),
+                LastSeen   = DateTime.UtcNow,
+                PeerId     = Guid.NewGuid().ToString()
+            };
+        }
+
+        // Bật UDP discovery listener để peer khác quét được mình
+        _udpDiscovery.StartListener();
+
+        _logger.LogInfo("PeerClient started (discovery listener running; server registration TODO).");
         await Task.CompletedTask;
     }
 
@@ -49,20 +67,29 @@ public class PeerClient
     /// </summary>
     public async Task StopAsync()
     {
+        if (!_isRunning) return;
+
         _isRunning = false;
 
-        // TODO: Implement shutdown sequence
-        // 1. Deregister from server
-        // 2. Stop all listeners
-        // 3. Cleanup resources
+        // TODO: 1. Deregister from server
+        // TODO: 2. Stop P2P listener
+        // TODO: 3. Cleanup other resources
 
-        _logger.LogInfo("TODO: Stop client");
+        _udpDiscovery.StopListener();
+
+        _logger.LogInfo("PeerClient stopped.");
         await Task.CompletedTask;
     }
+
+    /// <summary>
+    /// Quét LAN bằng UDP discovery để tìm các peers đang online.
+    /// Dùng chung UdpDiscovery (đã được chuẩn bị trong StartAsync).
+    /// </summary>
     public async Task<List<PeerInfo>> ScanLanAsync()
     {
         try
         {
+            // Nếu chưa có LocalPeerProvider (trường hợp Scan trước Start) thì set tạm
             if (_udpDiscovery.LocalPeerProvider == null)
             {
                 _udpDiscovery.LocalPeerProvider = () => new PeerInfo
@@ -75,6 +102,7 @@ public class PeerClient
                 };
             }
 
+            // Đảm bảo listener đang bật (idempotent)
             _udpDiscovery.StartListener();
 
             var peers = await _udpDiscovery.ScanNetworkAsync();
@@ -91,4 +119,3 @@ public class PeerClient
 
     public bool IsRunning => _isRunning;
 }
-
