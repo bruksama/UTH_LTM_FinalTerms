@@ -8,9 +8,19 @@ public class FileTransferRequestMessage : Message
     public override MessageType Type => MessageType.FileTransferRequest;
 
     /// <summary>
-    /// Tên file muốn tải
+    /// Tên file muốn gửi
     /// </summary>
     public string FileName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Kích thước file (bytes)
+    /// </summary>
+    public long FileSize { get; set; }
+
+    /// <summary>
+    /// Checksum của file (SHA256)
+    /// </summary>
+    public string Checksum { get; set; } = string.Empty;
 
     /// <summary>
     /// (Optional) Byte offset để resume transfer

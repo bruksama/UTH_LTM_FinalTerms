@@ -38,6 +38,11 @@ public class ClientConfig
     public string SharedDirectory { get; set; } = Path.Combine(Environment.CurrentDirectory, "shared");
 
     /// <summary>
+    /// Thư mục lưu file nhận được từ peers khác
+    /// </summary>
+    public string DownloadDirectory { get; set; } = Path.Combine(Environment.CurrentDirectory, "downloads");
+
+    /// <summary>
     /// Đường dẫn đến file log
     /// </summary>
     public string LogFilePath { get; set; } = "client.log";
