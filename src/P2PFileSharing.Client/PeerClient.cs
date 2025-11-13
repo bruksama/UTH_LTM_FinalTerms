@@ -7,7 +7,7 @@ namespace P2PFileSharing.Client;
 
 /// <summary>
 /// Main client class - quản lý peer client
-/// TODO: Implement client lifecycle và coordination giữa các components (phần server, P2P listener, heartbeat cho member khác)
+/// TODO: Implement client lifecycle và coordination giữa các components
 /// </summary>
 public class PeerClient
 {

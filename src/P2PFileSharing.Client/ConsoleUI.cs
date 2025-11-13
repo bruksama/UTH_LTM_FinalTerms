@@ -4,7 +4,6 @@ namespace P2PFileSharing.Client;
 
 /// <summary>
 /// Console UI để hiển thị và xử lý commands (FR-06)
-/// TODO: Implement command parser và UI
 /// </summary>
 public class ConsoleUI
 {
@@ -18,7 +17,7 @@ public class ConsoleUI
     }
 
     /// <summary>
-    /// Run command loop
+    /// Vòng lặp chính đọc lệnh từ console
     /// </summary>
     public async Task RunCommandLoopAsync()
     {
@@ -35,7 +34,7 @@ public class ConsoleUI
                     continue;
 
                 var parts = input.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                var command = parts[0].ToLower();
+                var command = parts[0].ToLowerInvariant();
 
                 switch (command)
                 {
@@ -51,14 +50,16 @@ public class ConsoleUI
                         if (parts.Length >= 3)
                             await HandleSendCommandAsync(parts[1], parts[2]);
                         else
-                            Console.WriteLine("Usage: send <peer_name> <file_name>");
+                            Console.WriteLine("Usage: send <peer_name> <file_path>");
                         break;
 
-                    case "help" or "?":
+                    case "help":
+                    case "?":
                         PrintHelp();
                         break;
 
-                    case "quit" or "exit":
+                    case "quit":
+                    case "exit":
                         await _client.StopAsync();
                         return;
 
@@ -94,15 +95,14 @@ public class ConsoleUI
 
     private async Task HandleListCommandAsync()
     {
-        // TODO: Query peers from server và display
-        Console.WriteLine("TODO: List peers");
+        // TODO: Query peers from server và display (dùng ServerCommunicator)
+        Console.WriteLine("TODO: List peers (from registry server)");
         await Task.CompletedTask;
     }
 
     private async Task HandleScanCommandAsync()
     {
-        // TODO: Scan network using UDP
-        Console.WriteLine("TODO: Scan network");
+        Console.WriteLine("Scanning LAN for peers...");
         var peers = await _client.ScanLanAsync();  // Sử dụng phương thức mới thêm vào PeerClient
 
         if (peers == null || peers.Count == 0)
@@ -123,15 +123,13 @@ public class ConsoleUI
             }
         }
 
-        _logger.LogInfo($"Scan completed: {peers.Count} peers discovered.");
+        _logger.LogInfo($"Scan completed: {peers.Count} peer(s) discovered.");
     }
 
     private async Task HandleSendCommandAsync(string peerName, string fileName)
     {
-        // TODO: Send file to peer
+        // TODO: Send file to peer (FileTransferManager)
         Console.WriteLine($"TODO: Send {fileName} to {peerName}");
         await Task.CompletedTask;
     }
-
 }
-
