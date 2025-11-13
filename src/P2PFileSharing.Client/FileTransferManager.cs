@@ -21,21 +21,34 @@ public class FileTransferManager
     private CancellationTokenSource? _receiverCts;
     private Task? _receiverTask;
     private int _actualListenPort;
+    private bool _isReceiverRunning;
 
     public FileTransferManager(ClientConfig config, ILogger logger)
     {
         _config = config;
         _logger = logger;
         _actualListenPort = config.ListenPort;
+        _isReceiverRunning = false;
     }
 
     /// <summary>
     /// Lấy port thực tế đang được sử dụng để listen
     /// </summary>
+    /// <returns>Port đang được sử dụng, hoặc -1 nếu receiver chưa start thành công</returns>
     public int GetActualListenPort()
     {
+        if (!_isReceiverRunning)
+        {
+            _logger.LogWarning("GetActualListenPort called but receiver is not running");
+            return -1; // Hoặc có thể throw exception
+        }
         return _actualListenPort;
     }
+
+    /// <summary>
+    /// Kiểm tra xem receiver có đang chạy không
+    /// </summary>
+    public bool IsReceiverRunning => _isReceiverRunning;
 
     /// <summary>
     /// Gửi file đến một peer (FR-04)
@@ -249,14 +262,17 @@ public class FileTransferManager
             if (!portAvailable)
             {
                 _logger.LogError("Cannot start file receiver: no available port found");
+                _isReceiverRunning = false;
+                _actualListenPort = -1; // Đánh dấu là không có port hợp lệ
                 return; // Không throw exception, chỉ log và return
             }
 
             _tcpListener = new TcpListener(IPAddress.Any, portToUse);
             _tcpListener.Start();
             
-            // Lưu port thực tế đang được sử dụng
+            // Lưu port thực tế đang được sử dụng CHỈ KHI listener đã start thành công
             _actualListenPort = portToUse;
+            _isReceiverRunning = true;
 
             _receiverCts = new CancellationTokenSource();
             _receiverTask = Task.Run(() => ListenForConnectionsAsync(_receiverCts.Token), _receiverCts.Token);
@@ -272,6 +288,8 @@ public class FileTransferManager
             _receiverTask = null;
             _receiverCts?.Dispose();
             _receiverCts = null;
+            _isReceiverRunning = false;
+            _actualListenPort = -1; // Đánh dấu là không có port hợp lệ
         }
         catch (Exception ex)
         {
@@ -281,6 +299,8 @@ public class FileTransferManager
             _receiverTask = null;
             _receiverCts?.Dispose();
             _receiverCts = null;
+            _isReceiverRunning = false;
+            _actualListenPort = -1; // Đánh dấu là không có port hợp lệ
         }
     }
 
@@ -482,6 +502,10 @@ public class FileTransferManager
             }
 
             await fileStream.FlushAsync(cts.Token);
+            
+            // Dispose fileStream TRƯỚC KHI tính checksum để tránh file lock
+            fileStream.Dispose();
+            fileStream = null;
 
             if (totalBytesReceived != fileSize)
             {
@@ -491,7 +515,7 @@ public class FileTransferManager
             }
             else
             {
-                // Verify checksum
+                // Verify checksum (fileStream đã được dispose, file có thể đọc được)
                 bool checksumValid = true;
                 if (!string.IsNullOrEmpty(checksum))
                 {
@@ -586,6 +610,8 @@ public class FileTransferManager
             _receiverTask = null;
             _receiverCts?.Dispose();
             _receiverCts = null;
+            _isReceiverRunning = false;
+            _actualListenPort = -1; // Reset về -1 khi stop
 
             _logger.LogInfo("File receiver stopped");
         }
