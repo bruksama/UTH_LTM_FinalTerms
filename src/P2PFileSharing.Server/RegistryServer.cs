@@ -5,10 +5,6 @@ using P2PFileSharing.Common.Infrastructure;
 
 namespace P2PFileSharing.Server;
 
-/// <summary>
-/// Main server class - TCP listener để nhận kết nối từ clients
-/// TODO: Implement TCP listener và accept connections
-/// </summary>
 public class RegistryServer
 {
     private readonly ServerConfig _config;
@@ -24,9 +20,6 @@ public class RegistryServer
         _peerRegistry = new PeerRegistry(config, logger);
     }
 
-    /// <summary>
-    /// Start server và bắt đầu lắng nghe kết nối
-    /// </summary>
     public async Task StartAsync()
     {
         try
@@ -66,10 +59,6 @@ public class RegistryServer
         }
     }
 
-    /// <summary>
-    /// Handle một client connection
-    /// TODO: Implement message handling logic
-    /// </summary>
     private async Task HandleClientAsync(TcpClient tcpClient)
     {
         var clientEndPoint = tcpClient.Client.RemoteEndPoint?.ToString() ?? "Unknown";
