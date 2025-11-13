@@ -205,19 +205,68 @@ public class FileTransferManager
                 _logger.LogInfo($"Created shared directory: {_config.SharedDirectory}");
             }
 
-            _tcpListener = new TcpListener(IPAddress.Any, _config.ListenPort);
+            // Thử bind port từ config
+            int portToUse = _config.ListenPort;
+            bool portAvailable = false;
+
+            // Kiểm tra port có available không
+            if (P2PFileSharing.Common.Utilities.NetworkHelper.IsPortAvailable(portToUse))
+            {
+                portAvailable = true;
+            }
+            else
+            {
+                // Port không available, tìm port khác
+                _logger.LogWarning($"Port {portToUse} is already in use. Searching for available port...");
+                try
+                {
+                    portToUse = P2PFileSharing.Common.Utilities.NetworkHelper.FindAvailablePort(
+                        _config.ListenPort, 
+                        _config.ListenPort + 100);
+                    portAvailable = true;
+                    _logger.LogInfo($"Found available port: {portToUse}");
+                    // Cập nhật config với port mới
+                    _config.ListenPort = portToUse;
+                }
+                catch (Exception portEx)
+                {
+                    _logger.LogError($"Could not find available port: {portEx.Message}");
+                    portAvailable = false;
+                }
+            }
+
+            if (!portAvailable)
+            {
+                _logger.LogError("Cannot start file receiver: no available port found");
+                return; // Không throw exception, chỉ log và return
+            }
+
+            _tcpListener = new TcpListener(IPAddress.Any, portToUse);
             _tcpListener.Start();
 
             _receiverCts = new CancellationTokenSource();
             _receiverTask = Task.Run(() => ListenForConnectionsAsync(_receiverCts.Token), _receiverCts.Token);
 
-            _logger.LogInfo($"File receiver started on port {_config.ListenPort}");
+            _logger.LogInfo($"File receiver started on port {portToUse}");
             _logger.LogInfo($"Shared directory: {_config.SharedDirectory}");
+        }
+        catch (SocketException ex)
+        {
+            _logger.LogError($"Failed to start file receiver on port {_config.ListenPort}: {ex.Message}", ex);
+            // Không throw exception, chỉ log và cleanup
+            _tcpListener = null;
+            _receiverTask = null;
+            _receiverCts?.Dispose();
+            _receiverCts = null;
         }
         catch (Exception ex)
         {
             _logger.LogError($"Failed to start file receiver: {ex.Message}", ex);
-            throw;
+            // Không throw exception, chỉ log và cleanup
+            _tcpListener = null;
+            _receiverTask = null;
+            _receiverCts?.Dispose();
+            _receiverCts = null;
         }
     }
 

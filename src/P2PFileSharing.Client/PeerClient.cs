@@ -1,4 +1,3 @@
-using System.Linq;
 using P2PFileSharing.Common.Configuration;
 using P2PFileSharing.Common.Infrastructure;
 using P2PFileSharing.Common.Models;
@@ -12,7 +11,6 @@ namespace P2PFileSharing.Client;
 /// </summary>
 public class PeerClient
 {
-    private readonly ClientConfig _config;
     private readonly ILogger _logger;
     private readonly ServerCommunicator _serverCommunicator;
     private readonly UdpDiscovery _udpDiscovery;
@@ -21,7 +19,6 @@ public class PeerClient
 
     public PeerClient(ClientConfig config, ILogger logger)
     {
-        _config = config;
         _logger = logger;
         _serverCommunicator = new ServerCommunicator(config, logger);
         _udpDiscovery = new UdpDiscovery(config, logger);
@@ -106,7 +103,7 @@ public class PeerClient
             var peers = await _udpDiscovery.ScanNetworkAsync();
             _logger.LogInfo($"ScanLanAsync: found {peers.Count} peer(s).");
 
-            return peers ?? new List<PeerInfo>();
+            return peers;
         }
         catch (Exception ex)
         {
