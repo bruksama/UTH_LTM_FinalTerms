@@ -95,9 +95,52 @@ public class ConsoleUI
 
     private async Task HandleListCommandAsync()
     {
-        // TODO: Query peers from server và display (dùng ServerCommunicator)
-        Console.WriteLine("TODO: List peers (from registry server)");
-        await Task.CompletedTask;
+        Console.WriteLine("Querying peers from registry server...");
+        var peers = await _client.QueryPeersAsync();
+
+        if (peers == null || peers.Count == 0)
+        {
+            Console.WriteLine("No peers found on registry server.");
+            Console.WriteLine("  Tip: Use 'scan' command to discover peers via UDP broadcast.");
+            return;
+        }
+
+        Console.WriteLine($"Found {peers.Count} peer(s) on registry server:");
+        Console.WriteLine();
+        
+        int i = 1;
+        foreach (var peer in peers)
+        {
+            Console.WriteLine($"{i++}. {peer.Username} ({peer.IpAddress}:{peer.ListenPort})");
+            if (peer.SharedFiles?.Count > 0)
+            {
+                foreach (var f in peer.SharedFiles)
+                {
+                    var sizeStr = FormatFileSize(f.FileSize);
+                    Console.WriteLine($"     - {f.FileName} ({sizeStr})");
+                }
+            }
+            else
+            {
+                Console.WriteLine("     (no shared files)");
+            }
+            Console.WriteLine();
+        }
+
+        _logger.LogInfo($"List command completed: {peers.Count} peer(s) displayed.");
+    }
+
+    private static string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len /= 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
     }
 
     private async Task HandleScanCommandAsync()
@@ -126,10 +169,39 @@ public class ConsoleUI
         _logger.LogInfo($"Scan completed: {peers.Count} peer(s) discovered.");
     }
 
-    private async Task HandleSendCommandAsync(string peerName, string fileName)
+    private async Task HandleSendCommandAsync(string peerName, string filePath)
     {
-        // TODO: Send file to peer (FileTransferManager)
-        Console.WriteLine($"TODO: Send {fileName} to {peerName}");
-        await Task.CompletedTask;
+        // Validate file path
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            Console.WriteLine("Error: File path cannot be empty.");
+            return;
+        }
+
+        // Resolve full path
+        var fullPath = Path.GetFullPath(filePath);
+        
+        if (!File.Exists(fullPath))
+        {
+            Console.WriteLine($"Error: File not found: {fullPath}");
+            return;
+        }
+
+        Console.WriteLine($"Sending file to peer '{peerName}'...");
+        Console.WriteLine($"  File: {Path.GetFileName(fullPath)}");
+        Console.WriteLine($"  Path: {fullPath}");
+        Console.WriteLine();
+
+        var success = await _client.SendFileAsync(peerName, fullPath);
+
+        if (success)
+        {
+            Console.WriteLine($"File sent successfully to {peerName}!");
+        }
+        else
+        {
+            Console.WriteLine($"Failed to send file to {peerName}.");
+            Console.WriteLine("  Check logs for more details.");
+        }
     }
 }

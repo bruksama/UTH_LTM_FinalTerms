@@ -1,3 +1,4 @@
+using System.Linq;
 using P2PFileSharing.Common.Configuration;
 using P2PFileSharing.Common.Infrastructure;
 using P2PFileSharing.Common.Models;
@@ -107,6 +108,75 @@ public class PeerClient
         {
             _logger.LogError($"ScanLanAsync failed: {ex.Message}", ex);
             return new List<PeerInfo>();
+        }
+    }
+
+    /// <summary>
+    /// Query danh sách peers từ Server (FR-03)
+    /// </summary>
+    public async Task<List<PeerInfo>> QueryPeersAsync(string? fileNameFilter = null)
+    {
+        return await _serverCommunicator.QueryPeersAsync(fileNameFilter);
+    }
+
+    /// <summary>
+    /// Gửi file đến một peer (FR-04)
+    /// </summary>
+    /// <param name="peerName">Tên peer (username) hoặc IP:Port</param>
+    /// <param name="filePath">Đường dẫn file cần gửi</param>
+    public async Task<bool> SendFileAsync(string peerName, string filePath)
+    {
+        try
+        {
+            // Tìm peer từ danh sách peers (từ server hoặc scan)
+            PeerInfo? targetPeer = null;
+
+            // Thử parse như IP:Port format
+            if (peerName.Contains(':'))
+            {
+                var parts = peerName.Split(':');
+                if (parts.Length == 2 && 
+                    System.Net.IPAddress.TryParse(parts[0], out _) && 
+                    int.TryParse(parts[1], out var port))
+                {
+                    targetPeer = new PeerInfo
+                    {
+                        IpAddress = parts[0],
+                        ListenPort = port,
+                        Username = peerName
+                    };
+                }
+            }
+
+            // Nếu không phải IP:Port, tìm theo username từ server
+            if (targetPeer == null)
+            {
+                var peers = await _serverCommunicator.QueryPeersAsync();
+                targetPeer = peers.FirstOrDefault(p => 
+                    string.Equals(p.Username, peerName, StringComparison.OrdinalIgnoreCase));
+            }
+
+            // Nếu vẫn không tìm thấy, thử từ scan results
+            if (targetPeer == null)
+            {
+                var scannedPeers = await ScanLanAsync();
+                targetPeer = scannedPeers.FirstOrDefault(p => 
+                    string.Equals(p.Username, peerName, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (targetPeer == null)
+            {
+                _logger.LogError($"Peer not found: {peerName}");
+                return false;
+            }
+
+            _logger.LogInfo($"Sending file to peer: {targetPeer.Username} ({targetPeer.IpAddress}:{targetPeer.ListenPort})");
+            return await _fileTransferManager.SendFileAsync(targetPeer.IpAddress, targetPeer.ListenPort, filePath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Error sending file to {peerName}: {ex.Message}", ex);
+            return false;
         }
     }
 
