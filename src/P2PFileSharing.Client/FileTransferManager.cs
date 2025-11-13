@@ -366,6 +366,9 @@ public class FileTransferManager
         var remoteEndPoint = tcpClient.Client.RemoteEndPoint?.ToString() ?? "unknown";
         NetworkStream? stream = null;
         FileStream? fileStream = null;
+        CancellationTokenSource? messageCts = null;
+        CancellationTokenSource? fileDataCts = null;
+        Task<string?>? inputTask = null;
 
         try
         {
@@ -375,11 +378,11 @@ public class FileTransferManager
             stream = tcpClient.GetStream();
             _logger.LogInfo($"Incoming connection from {remoteEndPoint}");
 
-            // 1. Nhận FileTransferRequestMessage
-            var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(ProtocolConstants.ReadWriteTimeout);
+            // 1. Nhận FileTransferRequestMessage (chỉ timeout cho message exchange)
+            messageCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            messageCts.CancelAfter(ProtocolConstants.ReadWriteTimeout);
 
-            var request = await MessageSerializer.ReceiveMessageAsync(stream, cts.Token);
+            var request = await MessageSerializer.ReceiveMessageAsync(stream, messageCts.Token);
             
             if (request == null)
             {
@@ -419,7 +422,7 @@ public class FileTransferManager
             bool accepted = false;
             string? userInput = null;
             
-            var inputTask = Task.Run(() => Console.ReadLine());
+            inputTask = Task.Run(() => Console.ReadLine());
             var timeoutTask = Task.Delay(TimeSpan.FromSeconds(30)); // 30 giây timeout
             var completedTask = await Task.WhenAny(inputTask, timeoutTask);
 
@@ -482,11 +485,15 @@ public class FileTransferManager
                 };
                 Console.WriteLine("\n✗ File transfer rejected.");
                 _logger.LogInfo($"File transfer rejected: {fileName} from {remoteEndPoint}");
-                await MessageSerializer.SendMessageAsync(stream, responseMessage, cts.Token);
+                await MessageSerializer.SendMessageAsync(stream, responseMessage, messageCts.Token);
                 return;
             }
 
-            await MessageSerializer.SendMessageAsync(stream, responseMessage, cts.Token);
+            await MessageSerializer.SendMessageAsync(stream, responseMessage, messageCts.Token);
+
+            // Tạo CancellationTokenSource mới KHÔNG có timeout cho phần nhận file data
+            fileDataCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            // KHÔNG gọi CancelAfter() - không có timeout cho file data transfer
 
             // Nhận file data và lưu vào disk
             fileStream = new FileStream(savePath, FileMode.Create, FileAccess.Write, FileShare.None, _config.BufferSize, useAsync: true);
@@ -497,15 +504,16 @@ public class FileTransferManager
 
             Console.WriteLine("Receiving file data...");
 
-            while (totalBytesReceived < fileSize && !cts.Token.IsCancellationRequested)
+            // Nhận file data (KHÔNG có timeout)
+            while (totalBytesReceived < fileSize && !fileDataCts.Token.IsCancellationRequested)
             {
                 var bytesToRead = (int)Math.Min(buffer.Length, fileSize - totalBytesReceived);
-                var bytesRead = await stream.ReadAsync(buffer, 0, bytesToRead, cts.Token);
+                var bytesRead = await stream.ReadAsync(buffer, 0, bytesToRead, fileDataCts.Token);
 
                 if (bytesRead == 0)
                     break;
 
-                await fileStream.WriteAsync(buffer, 0, bytesRead, cts.Token);
+                await fileStream.WriteAsync(buffer, 0, bytesRead, fileDataCts.Token);
                 totalBytesReceived += bytesRead;
 
                 // Log progress mỗi 10%
@@ -521,7 +529,7 @@ public class FileTransferManager
                 }
             }
 
-            await fileStream.FlushAsync(cts.Token);
+            await fileStream.FlushAsync(fileDataCts.Token);
             
             // Dispose fileStream TRƯỚC KHI tính checksum để tránh file lock
             fileStream.Dispose();
@@ -587,6 +595,31 @@ public class FileTransferManager
             stream?.Dispose();
             tcpClient?.Close();
             tcpClient?.Dispose();
+            messageCts?.Dispose();
+            fileDataCts?.Dispose();
+            // Ensure inputTask is cleaned up if it's still running
+            // Note: Console.ReadLine() cannot be cancelled, so if timeout occurred,
+            // the task will continue running until user presses Enter.
+            // This is a limitation of Console.ReadLine() - it doesn't support cancellation.
+            // The task will complete naturally when user presses Enter, and the input
+            // will be discarded since we've already handled the timeout case.
+            if (inputTask != null && !inputTask.IsCompleted)
+            {
+                // Fire and forget - we can't cancel Console.ReadLine(), but we've
+                // already handled the timeout case, so any future input will be ignored
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await inputTask;
+                        // Input received after timeout - ignore it
+                    }
+                    catch
+                    {
+                        // Ignore any errors
+                    }
+                });
+            }
             _logger.LogDebug($"Connection closed: {remoteEndPoint}");
         }
     }
