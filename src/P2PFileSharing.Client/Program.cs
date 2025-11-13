@@ -48,6 +48,12 @@ class Program
             var client = new PeerClient(config, logger);
             await client.StartAsync();
 
+            // Kiểm tra xem client có start thành công không
+            if (!client.IsRunning)
+            {
+                Console.WriteLine("Warning: Client may not have started properly. Check logs for details.");
+            }
+
             // Run command loop
             var consoleUI = new ConsoleUI(client, logger);
             await consoleUI.RunCommandLoopAsync();
@@ -55,6 +61,8 @@ class Program
         catch (Exception ex)
         {
             logger.LogError("Fatal error occurred", ex);
+            Console.WriteLine($"Fatal error: {ex.Message}");
+            Console.WriteLine("Check log file for more details.");
             Environment.Exit(1);
         }
     }
