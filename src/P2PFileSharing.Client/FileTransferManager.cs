@@ -30,6 +30,7 @@ public class FileTransferManager
         // 4. If accepted, send file data
         // 5. Verify checksum
         _logger.LogInfo($"TODO: Send file {filePath} to {peerIpAddress}:{peerPort}");
+        await Task.CompletedTask;
         return false;
     }
 

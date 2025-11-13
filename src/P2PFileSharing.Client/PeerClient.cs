@@ -41,6 +41,7 @@ public class PeerClient
         // 4. Start heartbeat task
 
         _logger.LogInfo("TODO: Start client");
+        await Task.CompletedTask;
     }
 
     /// <summary>
@@ -56,6 +57,7 @@ public class PeerClient
         // 3. Cleanup resources
 
         _logger.LogInfo("TODO: Stop client");
+        await Task.CompletedTask;
     }
     public async Task<List<PeerInfo>> ScanLanAsync()
     {

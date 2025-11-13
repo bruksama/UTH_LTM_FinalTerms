@@ -49,12 +49,26 @@ public class ServerCommunicator
             using var client = new System.Net.Sockets.TcpClient();
 
             // Connect with timeout
-            var cts = new CancellationTokenSource((int)P2PFileSharing.Common.Protocol.ProtocolConstants.ConnectionTimeout.TotalMilliseconds);
+            var timeoutMs = (int)P2PFileSharing.Common.Protocol.ProtocolConstants.ConnectionTimeout.TotalMilliseconds;
+            var cts = new CancellationTokenSource(timeoutMs);
+            
+            _logger.LogInfo($"Connecting to server {_config.ServerIpAddress}:{_config.ServerPort}...");
+            
             var connectTask = client.ConnectAsync(_config.ServerIpAddress, _config.ServerPort);
-            var completed = await Task.WhenAny(connectTask, Task.Delay(Timeout.Infinite, cts.Token));
-            if (completed != connectTask || !client.Connected)
+            var timeoutTask = Task.Delay(timeoutMs, cts.Token);
+            var completed = await Task.WhenAny(connectTask, timeoutTask);
+            
+            if (completed == timeoutTask || !client.Connected)
             {
-                _logger.LogInfo($"Register: cannot connect to server {_config.ServerIpAddress}:{_config.ServerPort}");
+                var errorMsg = completed == timeoutTask
+                    ? $"Connection timeout after {timeoutMs}ms"
+                    : "Connection failed";
+                _logger.LogInfo($"Register: {errorMsg} - Cannot connect to server {_config.ServerIpAddress}:{_config.ServerPort}");
+                _logger.LogInfo($"  Hãy kiểm tra:");
+                _logger.LogInfo($"  1. Server đã được khởi động chưa?");
+                _logger.LogInfo($"  2. IP address và port có đúng không?");
+                _logger.LogInfo($"  3. Firewall có chặn kết nối không?");
+                _logger.LogInfo($"  4. Cả hai máy có cùng mạng LAN không?");
                 return false;
             }
 
@@ -118,6 +132,7 @@ public class ServerCommunicator
         // 3. Receive QueryResponseMessage
         // 4. Return list of peers
         _logger.LogInfo($"TODO: Query peers from server (filter: {fileNameFilter ?? "none"})");
+        await Task.CompletedTask;
         return new List<PeerInfo>();
     }
 
@@ -128,6 +143,7 @@ public class ServerCommunicator
     {
         // TODO: Implement deregistration
         _logger.LogInfo($"TODO: Deregister peer {peerId} from server");
+        await Task.CompletedTask;
         return false;
     }
 
@@ -138,6 +154,7 @@ public class ServerCommunicator
     {
         // TODO: Implement heartbeat
         _logger.LogDebug($"TODO: Send heartbeat for peer {peerId}");
+        await Task.CompletedTask;
     }
 }
 
