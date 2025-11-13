@@ -96,6 +96,7 @@ public class ConsoleUI
     {
         // TODO: Query peers from server và display
         Console.WriteLine("TODO: List peers");
+        await Task.CompletedTask;
     }
 
     private async Task HandleScanCommandAsync()
@@ -129,6 +130,7 @@ public class ConsoleUI
     {
         // TODO: Send file to peer
         Console.WriteLine($"TODO: Send {fileName} to {peerName}");
+        await Task.CompletedTask;
     }
 
 }

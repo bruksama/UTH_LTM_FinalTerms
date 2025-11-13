@@ -68,6 +68,13 @@ public class ClientConfig
             return false;
         }
 
+        // Validate IP address format
+        if (!System.Net.IPAddress.TryParse(ServerIpAddress, out _))
+        {
+            errorMessage = $"Invalid IP address format: {ServerIpAddress}";
+            return false;
+        }
+
         if (ServerPort < 1 || ServerPort > 65535)
         {
             errorMessage = "ServerPort must be between 1 and 65535";
