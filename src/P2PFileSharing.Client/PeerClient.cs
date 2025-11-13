@@ -274,4 +274,92 @@ public class PeerClient
     }
 
     public bool IsRunning => _isRunning;
+
+    /// <summary>
+    /// Set ConsoleUI reference để FileTransferManager có thể tạm dừng command loop
+    /// </summary>
+    public void SetConsoleUI(ConsoleUI? consoleUI)
+    {
+        _fileTransferManager.SetConsoleUI(consoleUI);
+    }
+
+    /// <summary>
+    /// Thay đổi username của peer và re-register với server nếu đang running
+    /// </summary>
+    public async Task<bool> ChangeUsernameAsync(string newUsername)
+    {
+        if (string.IsNullOrWhiteSpace(newUsername))
+        {
+            _logger.LogError("Cannot change username: new username cannot be empty");
+            return false;
+        }
+
+        var oldUsername = _config.Username;
+        
+        // Cập nhật config
+        _config.Username = newUsername;
+
+        // Cập nhật current peer info nếu đã tồn tại
+        if (_currentPeerInfo != null)
+        {
+            _currentPeerInfo.Username = newUsername;
+        }
+
+        // Nếu đang running, cần re-register với server
+        if (_isRunning)
+        {
+            // Hủy đăng ký với username cũ
+            if (_currentPeerInfo != null && !string.IsNullOrEmpty(_currentPeerInfo.PeerId))
+            {
+                await _serverCommunicator.DeregisterAsync(_currentPeerInfo.PeerId);
+                _logger.LogInfo($"Deregistered old username: {oldUsername}");
+            }
+
+            // Tạo PeerId mới cho username mới
+            if (_currentPeerInfo != null)
+            {
+                _currentPeerInfo.PeerId = Guid.NewGuid().ToString();
+                _currentPeerInfo.LastSeen = DateTime.UtcNow;
+                _currentPeerInfo.SharedFiles = GetSharedFiles();
+            }
+
+            // Đăng ký lại với username mới
+            if (_currentPeerInfo != null && _fileTransferManager.IsReceiverRunning)
+            {
+                var registered = await _serverCommunicator.RegisterAsync(_currentPeerInfo);
+                if (registered)
+                {
+                    _logger.LogInfo($"Successfully re-registered with new username: {newUsername}");
+                }
+                else
+                {
+                    _logger.LogWarning($"Failed to re-register with new username: {newUsername}");
+                    // Rollback username nếu re-register thất bại
+                    _config.Username = oldUsername;
+                    if (_currentPeerInfo != null)
+                    {
+                        _currentPeerInfo.Username = oldUsername;
+                    }
+                    return false;
+                }
+            }
+
+            // Cập nhật UDP Discovery LocalPeerProvider với username mới
+            if (_currentPeerInfo != null)
+            {
+                _udpDiscovery.LocalPeerProvider = () => new PeerInfo
+                {
+                    Username = _currentPeerInfo.Username,
+                    IpAddress = _currentPeerInfo.IpAddress,
+                    ListenPort = _currentPeerInfo.ListenPort,
+                    LastSeen = DateTime.UtcNow,
+                    PeerId = _currentPeerInfo.PeerId,
+                    SharedFiles = _currentPeerInfo.SharedFiles
+                };
+            }
+        }
+
+        _logger.LogInfo($"Username changed from '{oldUsername}' to '{newUsername}'");
+        return true;
+    }
 }

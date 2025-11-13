@@ -15,6 +15,7 @@ public class FileTransferManager
 {
     private readonly ClientConfig _config;
     private readonly ILogger _logger;
+    private ConsoleUI? _consoleUI;
 
     // Fields để quản lý receiver
     private TcpListener? _tcpListener;
@@ -29,6 +30,14 @@ public class FileTransferManager
         _logger = logger;
         _actualListenPort = config.ListenPort;
         _isReceiverRunning = false;
+    }
+
+    /// <summary>
+    /// Set ConsoleUI reference để có thể tạm dừng command loop khi chờ file transfer input
+    /// </summary>
+    public void SetConsoleUI(ConsoleUI? consoleUI)
+    {
+        _consoleUI = consoleUI;
     }
 
     /// <summary>
@@ -114,12 +123,13 @@ public class FileTransferManager
                 Checksum = checksum
             };
 
-            var cts = new CancellationTokenSource(ProtocolConstants.ReadWriteTimeout);
-            await MessageSerializer.SendMessageAsync(stream, requestMessage, cts.Token);
+            // Chỉ timeout cho message exchange (request/response)
+            var messageCts = new CancellationTokenSource(ProtocolConstants.ReadWriteTimeout);
+            await MessageSerializer.SendMessageAsync(stream, requestMessage, messageCts.Token);
             _logger.LogDebug($"Sent FileTransferRequestMessage: {fileName} ({fileSize} bytes)");
 
-            // Đợi phản hồi từ người nhận
-            var response = await MessageSerializer.ReceiveMessageAsync(stream, cts.Token);
+            // Đợi phản hồi từ người nhận (với timeout)
+            var response = await MessageSerializer.ReceiveMessageAsync(stream, messageCts.Token);
 
             if (response == null) {
                 _logger.LogError($"No response from peer {peerIpAddress}:{peerPort}");
@@ -142,20 +152,23 @@ public class FileTransferManager
             _logger.LogInfo($"File transfer accepted by peer. Starting to send file data...");
             Console.WriteLine($"Peer accepted file transfer. Sending {fileName}...");
 
+            // Tạo CancellationTokenSource mới KHÔNG có timeout cho phần gửi file data
+            var fileDataCts = new CancellationTokenSource();
+
             fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, _config.BufferSize, useAsync: true);
             
             var buffer = new byte[_config.BufferSize];
             long totalBytesSent = 0;
             var startTime = DateTime.UtcNow;
 
-            // Gửi file data
+            // Gửi file data (KHÔNG có timeout)
             while (totalBytesSent < fileSize) {
                 var bytesToRead = (int)Math.Min(buffer.Length, fileSize - totalBytesSent);
-                var bytesRead = await fileStream.ReadAsync(buffer, 0, bytesToRead, cts.Token);
+                var bytesRead = await fileStream.ReadAsync(buffer, 0, bytesToRead, fileDataCts.Token);
 
                 if (bytesRead == 0) break;
 
-                await stream.WriteAsync(buffer, 0, bytesRead, cts.Token);
+                await stream.WriteAsync(buffer, 0, bytesRead, fileDataCts.Token);
                 totalBytesSent += bytesRead;
 
                 if (fileSize > 0) {
@@ -169,7 +182,7 @@ public class FileTransferManager
                 }
             }
 
-            await stream.FlushAsync(cts.Token);
+            await stream.FlushAsync(fileDataCts.Token);
 
             if (totalBytesSent != fileSize) {
                 _logger.LogError($"File transfer incomplete: sent {totalBytesSent}/{fileSize} bytes");
@@ -396,6 +409,10 @@ public class FileTransferManager
                 Console.WriteLine($"  Checksum: {checksum.Substring(0, Math.Min(16, checksum.Length))}...");
             }
             Console.WriteLine("═══════════════════════════════════════════════════════");
+            
+            // Tạm dừng command loop để tránh race condition với Console.ReadLine()
+            _consoleUI?.SetWaitingForFileTransferInput(true);
+            
             Console.Write("Accept this file transfer? (y/n): ");
 
             // Đọc user input (với timeout)
@@ -417,6 +434,9 @@ public class FileTransferManager
                 Console.WriteLine("\nTimeout - Transfer rejected (no response within 30 seconds)");
                 accepted = false;
             }
+
+            // Resume command loop sau khi đã đọc input
+            _consoleUI?.SetWaitingForFileTransferInput(false);
 
             // Tạo download directory nếu chưa tồn tại
             if (!Directory.Exists(_config.DownloadDirectory))
