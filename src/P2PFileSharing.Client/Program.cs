@@ -56,6 +56,8 @@ class Program
 
             // Run command loop
             var consoleUI = new ConsoleUI(client, logger);
+            // Set ConsoleUI reference để FileTransferManager có thể tạm dừng command loop khi chờ file transfer input
+            client.SetConsoleUI(consoleUI);
             await consoleUI.RunCommandLoopAsync();
         }
         catch (Exception ex)

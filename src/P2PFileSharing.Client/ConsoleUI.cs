@@ -9,11 +9,26 @@ public class ConsoleUI
 {
     private readonly PeerClient _client;
     private readonly ILogger _logger;
+    private bool _isWaitingForFileTransferInput;
 
     public ConsoleUI(PeerClient client, ILogger logger)
     {
         _client = client;
         _logger = logger;
+        _isWaitingForFileTransferInput = false;
+    }
+
+    /// <summary>
+    /// Kiểm tra xem có đang chờ input từ file transfer prompt không
+    /// </summary>
+    public bool IsWaitingForFileTransferInput => _isWaitingForFileTransferInput;
+
+    /// <summary>
+    /// Set flag để tạm dừng command loop khi đang chờ file transfer input
+    /// </summary>
+    public void SetWaitingForFileTransferInput(bool waiting)
+    {
+        _isWaitingForFileTransferInput = waiting;
     }
 
     /// <summary>
@@ -28,6 +43,13 @@ public class ConsoleUI
         {
             try
             {
+                // Tạm dừng nếu đang chờ file transfer input
+                if (_isWaitingForFileTransferInput)
+                {
+                    await Task.Delay(100); // Sleep ngắn để tránh busy wait
+                    continue;
+                }
+
                 Console.Write("> ");
                 var input = Console.ReadLine();
                 if (string.IsNullOrWhiteSpace(input))
@@ -51,6 +73,14 @@ public class ConsoleUI
                             await HandleSendCommandAsync(parts[1], parts[2]);
                         else
                             Console.WriteLine("Usage: send <peer_name> <file_path>");
+                        break;
+
+                    case "username":
+                    case "setname":
+                        if (parts.Length >= 2)
+                            await HandleUsernameCommandAsync(parts[1]);
+                        else
+                            Console.WriteLine("Usage: username <new_username>");
                         break;
 
                     case "help":
@@ -88,6 +118,7 @@ public class ConsoleUI
         Console.WriteLine("  list                    - List all online peers and their shared files");
         Console.WriteLine("  scan                    - Scan LAN using UDP broadcast");
         Console.WriteLine("  send <peer> <file>      - Send file to peer");
+        Console.WriteLine("  username <name>         - Change peer username");
         Console.WriteLine("  help                    - Show this help message");
         Console.WriteLine("  quit/exit               - Exit application");
         Console.WriteLine();
@@ -201,6 +232,37 @@ public class ConsoleUI
         else
         {
             Console.WriteLine($"Failed to send file to {peerName}.");
+            Console.WriteLine("  Check logs for more details.");
+        }
+    }
+
+    private async Task HandleUsernameCommandAsync(string newUsername)
+    {
+        // Validate input
+        if (string.IsNullOrWhiteSpace(newUsername))
+        {
+            Console.WriteLine("Error: Username cannot be empty.");
+            return;
+        }
+
+        // Trim whitespace
+        newUsername = newUsername.Trim();
+
+        Console.WriteLine($"Changing username to '{newUsername}'...");
+        
+        var success = await _client.ChangeUsernameAsync(newUsername);
+        
+        if (success)
+        {
+            Console.WriteLine($"✓ Username changed successfully to '{newUsername}'");
+            if (_client.IsRunning)
+            {
+                Console.WriteLine("  Note: Peer has been re-registered with the server using the new username.");
+            }
+        }
+        else
+        {
+            Console.WriteLine($"✗ Failed to change username to '{newUsername}'");
             Console.WriteLine("  Check logs for more details.");
         }
     }
