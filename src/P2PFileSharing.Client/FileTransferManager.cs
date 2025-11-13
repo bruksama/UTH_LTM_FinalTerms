@@ -20,11 +20,21 @@ public class FileTransferManager
     private TcpListener? _tcpListener;
     private CancellationTokenSource? _receiverCts;
     private Task? _receiverTask;
+    private int _actualListenPort;
 
     public FileTransferManager(ClientConfig config, ILogger logger)
     {
         _config = config;
         _logger = logger;
+        _actualListenPort = config.ListenPort;
+    }
+
+    /// <summary>
+    /// Lấy port thực tế đang được sử dụng để listen
+    /// </summary>
+    public int GetActualListenPort()
+    {
+        return _actualListenPort;
     }
 
     /// <summary>
@@ -225,8 +235,9 @@ public class FileTransferManager
                         _config.ListenPort + 100);
                     portAvailable = true;
                     _logger.LogInfo($"Found available port: {portToUse}");
-                    // Cập nhật config với port mới
+                    // Cập nhật config và actual port với port mới
                     _config.ListenPort = portToUse;
+                    _actualListenPort = portToUse;
                 }
                 catch (Exception portEx)
                 {
@@ -243,6 +254,9 @@ public class FileTransferManager
 
             _tcpListener = new TcpListener(IPAddress.Any, portToUse);
             _tcpListener.Start();
+            
+            // Lưu port thực tế đang được sử dụng
+            _actualListenPort = portToUse;
 
             _receiverCts = new CancellationTokenSource();
             _receiverTask = Task.Run(() => ListenForConnectionsAsync(_receiverCts.Token), _receiverCts.Token);
