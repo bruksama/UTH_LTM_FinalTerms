@@ -156,6 +156,17 @@ public class PeerRegistry
     }
 
     /// <summary>
+    /// Query danh sách peers (lọc theo tên file nếu có), đã áp dụng TTL & sort
+    /// </summary>
+    public List<PeerInfo> QueryPeers(string? fileNameFilter = null)
+    {
+        if (string.IsNullOrWhiteSpace(fileNameFilter))
+            return GetAllPeers();
+
+        return GetPeersWithFile(fileNameFilter);
+    }
+
+    /// <summary>
     /// Update heartbeat cho một peer
     /// </summary>
     public void UpdateHeartbeat(string peerId)
