@@ -41,6 +41,9 @@ public class PeerClient
         // TODO: 2. Start P2P listener (FileTransferManager)
         // TODO: 3. Start heartbeat task
         
+        // Start file receiver để nhận file từ peers khác
+        _fileTransferManager.StartReceiver();
+        
         if (_udpDiscovery.LocalPeerProvider == null)
         {
             _udpDiscovery.LocalPeerProvider = () => new PeerInfo
@@ -72,6 +75,7 @@ public class PeerClient
         // TODO: 2. Stop P2P listener
         // TODO: 3. Cleanup other resources
 
+        _fileTransferManager.StopReceiver();
         _udpDiscovery.StopListener();
 
         _logger.LogInfo("PeerClient stopped.");

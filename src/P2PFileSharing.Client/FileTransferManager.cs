@@ -57,6 +57,11 @@ public class FileTransferManager
 
         _logger.LogInfo($"Preparing to send file: {fileName} ({fileSize} bytes) to {peerIpAddress}:{peerPort}");
 
+        // Tính checksum trước khi gửi
+        _logger.LogInfo("Calculating file checksum...");
+        var checksum = await ChecksumCalculator.CalculateSHA256Async(filePath);
+        _logger.LogDebug($"File checksum: {checksum}");
+
         TcpClient? tcpClient = null;
         NetworkStream? stream = null;
         FileStream? fileStream = null;
@@ -78,15 +83,19 @@ public class FileTransferManager
             _logger.LogInfo($"Connected to peer {peerIpAddress}:{peerPort}");
             stream = tcpClient.GetStream();
 
+            // Gửi FileTransferRequestMessage với thông tin file đầy đủ
             var requestMessage = new FileTransferRequestMessage
             {
-                FileName = fileName
+                FileName = fileName,
+                FileSize = fileSize,
+                Checksum = checksum
             };
 
             var cts = new CancellationTokenSource(ProtocolConstants.ReadWriteTimeout);
             await MessageSerializer.SendMessageAsync(stream, requestMessage, cts.Token);
-            _logger.LogDebug($"Sent FileTransferRequestMessage for file: {fileName}");
+            _logger.LogDebug($"Sent FileTransferRequestMessage: {fileName} ({fileSize} bytes)");
 
+            // Đợi phản hồi từ người nhận
             var response = await MessageSerializer.ReceiveMessageAsync(stream, cts.Token);
 
             if (response == null) {
@@ -103,19 +112,12 @@ public class FileTransferManager
             if (!responseMessage.Accepted)
             {
                 _logger.LogError($"File transfer rejected: {responseMessage.ErrorMessage ?? "Unknown reason"}");
+                Console.WriteLine($"File transfer rejected by peer: {responseMessage.ErrorMessage ?? "Unknown reason"}");
                 return false;
             }
 
-            _logger.LogInfo($"File transfer accepted. Expected file size: {responseMessage.FileSize} bytes");
-
-            if (responseMessage.FileSize != fileSize)
-            {
-                _logger.LogWarning($"File size mismatch: local={fileSize}, expected={responseMessage.FileSize}");
-            }
-
-            _logger.LogInfo("Calculating file checksum...");
-            var checksum = await ChecksumCalculator.CalculateSHA256Async(filePath);
-            _logger.LogDebug($"File checksum: {checksum}");
+            _logger.LogInfo($"File transfer accepted by peer. Starting to send file data...");
+            Console.WriteLine($"Peer accepted file transfer. Sending {fileName}...");
 
             fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, _config.BufferSize, useAsync: true);
             
@@ -123,8 +125,7 @@ public class FileTransferManager
             long totalBytesSent = 0;
             var startTime = DateTime.UtcNow;
 
-            _logger.LogInfo($"Starting file transfer: {fileName}");
-
+            // Gửi file data
             while (totalBytesSent < fileSize) {
                 var bytesToRead = (int)Math.Min(buffer.Length, fileSize - totalBytesSent);
                 var bytesRead = await fileStream.ReadAsync(buffer, 0, bytesToRead, cts.Token);
@@ -139,6 +140,7 @@ public class FileTransferManager
                     if (totalBytesSent % (fileSize / 10 + 1) == 0 || totalBytesSent == fileSize) {
                         var elapsed = DateTime.UtcNow - startTime;
                         var speed = totalBytesSent / elapsed.TotalSeconds / 1024 / 1024;
+                        Console.WriteLine($"  Progress: {progress:F1}% ({totalBytesSent}/{fileSize} bytes, {speed:F2} MB/s)");
                         _logger.LogInfo($"Transferred {totalBytesSent} of {fileSize} bytes ({progress:F1}%). Speed: {speed:F2} MB/s");
                     }
                 }
@@ -151,13 +153,10 @@ public class FileTransferManager
                 return false;
             }
 
-            if (!string.IsNullOrEmpty(responseMessage.Checksum)) {
-                if (string.Equals(checksum, responseMessage.Checksum, StringComparison.OrdinalIgnoreCase)) {
-                    _logger.LogInfo("Checksum verification: PASSED");
-                } else {
-                    _logger.LogWarning($"Checksum mismatch: local={checksum}, remote={responseMessage.Checksum}");
-                }
-            }
+            var transferTime = DateTime.UtcNow - startTime;
+            var throughput = fileSize / transferTime.TotalSeconds / (1024 * 1024);
+            Console.WriteLine($"File sent successfully! ({throughput:F2} MB/s)");
+            _logger.LogInfo($"File transfer completed: {fileName} ({fileSize} bytes) in {transferTime.TotalSeconds:F2}s ({throughput:F2} MB/s)");
 
             return true;
         }
@@ -299,107 +298,164 @@ public class FileTransferManager
             }
 
             var fileName = requestMessage.FileName;
-            _logger.LogInfo($"File transfer request from {remoteEndPoint}: {fileName}");
+            var fileSize = requestMessage.FileSize;
+            var checksum = requestMessage.Checksum;
 
-            // 2. Tìm file trong shared directory
-            var filePath = Path.Combine(_config.SharedDirectory, fileName);
-            
-            // Security: Chỉ cho phép file trong shared directory (prevent path traversal)
-            filePath = Path.GetFullPath(filePath);
-            var sharedDirFullPath = Path.GetFullPath(_config.SharedDirectory);
-            
-            if (!filePath.StartsWith(sharedDirFullPath, StringComparison.OrdinalIgnoreCase))
+            // Hiển thị thông tin file transfer request trên console
+            Console.WriteLine();
+            Console.WriteLine("═══════════════════════════════════════════════════════");
+            Console.WriteLine("  Incoming File Transfer Request");
+            Console.WriteLine($"  From: {remoteEndPoint}");
+            Console.WriteLine($"  File: {fileName}");
+            Console.WriteLine($"  Size: {FormatFileSize(fileSize)} ({fileSize} bytes)");
+            if (!string.IsNullOrEmpty(checksum))
             {
-                _logger.LogWarning($"Security: Attempted path traversal from {remoteEndPoint} - {fileName}");
-                var rejectResponse = new FileTransferResponseMessage
+                Console.WriteLine($"  Checksum: {checksum.Substring(0, Math.Min(16, checksum.Length))}...");
+            }
+            Console.WriteLine("═══════════════════════════════════════════════════════");
+            Console.Write("Accept this file transfer? (y/n): ");
+
+            // Đọc user input (với timeout)
+            bool accepted = false;
+            string? userInput = null;
+            
+            var inputTask = Task.Run(() => Console.ReadLine());
+            var timeoutTask = Task.Delay(TimeSpan.FromSeconds(30)); // 30 giây timeout
+            var completedTask = await Task.WhenAny(inputTask, timeoutTask);
+
+            if (completedTask == inputTask)
+            {
+                userInput = await inputTask;
+                accepted = userInput?.Trim().ToLowerInvariant() == "y" || 
+                          userInput?.Trim().ToLowerInvariant() == "yes";
+            }
+            else
+            {
+                Console.WriteLine("\nTimeout - Transfer rejected (no response within 30 seconds)");
+                accepted = false;
+            }
+
+            // Tạo download directory nếu chưa tồn tại
+            if (!Directory.Exists(_config.DownloadDirectory))
+            {
+                Directory.CreateDirectory(_config.DownloadDirectory);
+            }
+
+            // Xác định đường dẫn file sẽ lưu
+            var savePath = Path.Combine(_config.DownloadDirectory, fileName);
+            
+            // Nếu file đã tồn tại, thêm số vào tên
+            int counter = 1;
+            while (File.Exists(savePath))
+            {
+                var nameWithoutExt = Path.GetFileNameWithoutExtension(fileName);
+                var ext = Path.GetExtension(fileName);
+                savePath = Path.Combine(_config.DownloadDirectory, $"{nameWithoutExt}_{counter}{ext}");
+                counter++;
+            }
+
+            // Gửi FileTransferResponseMessage
+            FileTransferResponseMessage responseMessage;
+            
+            if (accepted)
+            {
+                responseMessage = new FileTransferResponseMessage
+                {
+                    Accepted = true,
+                    FileName = fileName,
+                    FileSize = fileSize,
+                    Checksum = checksum
+                };
+                Console.WriteLine($"\n✓ File transfer accepted. Saving to: {savePath}");
+                _logger.LogInfo($"File transfer accepted: {fileName} ({fileSize} bytes) from {remoteEndPoint}");
+            }
+            else
+            {
+                responseMessage = new FileTransferResponseMessage
                 {
                     Accepted = false,
                     FileName = fileName,
-                    ErrorMessage = "Invalid file path"
+                    ErrorMessage = userInput == null ? "Timeout" : "User rejected"
                 };
-                await MessageSerializer.SendMessageAsync(stream, rejectResponse, cts.Token);
+                Console.WriteLine("\n✗ File transfer rejected.");
+                _logger.LogInfo($"File transfer rejected: {fileName} from {remoteEndPoint}");
+                await MessageSerializer.SendMessageAsync(stream, responseMessage, cts.Token);
                 return;
             }
 
-            // 3. Kiểm tra file có tồn tại không
-            if (!File.Exists(filePath))
-            {
-                _logger.LogWarning($"File not found: {fileName} (requested by {remoteEndPoint})");
-                var rejectResponse = new FileTransferResponseMessage
-                {
-                    Accepted = false,
-                    FileName = fileName,
-                    ErrorMessage = $"File not found: {fileName}"
-                };
-                await MessageSerializer.SendMessageAsync(stream, rejectResponse, cts.Token);
-                return;
-            }
+            await MessageSerializer.SendMessageAsync(stream, responseMessage, cts.Token);
 
-            // 4. Lấy thông tin file
-            var fileInfo = new FileInfo(filePath);
-            var fileSize = fileInfo.Length;
-
-            // 5. Tính checksum của file
-            _logger.LogInfo($"Calculating checksum for {fileName}...");
-            var checksum = await ChecksumCalculator.CalculateSHA256Async(filePath);
-            _logger.LogDebug($"File checksum: {checksum}");
-
-            // 6. Gửi FileTransferResponseMessage (accepted)
-            var acceptResponse = new FileTransferResponseMessage
-            {
-                Accepted = true,
-                FileName = fileName,
-                FileSize = fileSize,
-                Checksum = checksum
-            };
-
-            await MessageSerializer.SendMessageAsync(stream, acceptResponse, cts.Token);
-            _logger.LogInfo($"File transfer accepted: {fileName} ({fileSize} bytes) to {remoteEndPoint}");
-
-            // 7. Gửi file data
-            fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, _config.BufferSize, useAsync: true);
+            // Nhận file data và lưu vào disk
+            fileStream = new FileStream(savePath, FileMode.Create, FileAccess.Write, FileShare.None, _config.BufferSize, useAsync: true);
             
             var buffer = new byte[_config.BufferSize];
-            long totalBytesSent = 0;
+            long totalBytesReceived = 0;
             var startTime = DateTime.UtcNow;
 
-            _logger.LogInfo($"Starting to send file: {fileName} to {remoteEndPoint}");
+            Console.WriteLine("Receiving file data...");
 
-            while (totalBytesSent < fileSize && !cts.Token.IsCancellationRequested)
+            while (totalBytesReceived < fileSize && !cts.Token.IsCancellationRequested)
             {
-                var bytesToRead = (int)Math.Min(buffer.Length, fileSize - totalBytesSent);
-                var bytesRead = await fileStream.ReadAsync(buffer, 0, bytesToRead, cts.Token);
+                var bytesToRead = (int)Math.Min(buffer.Length, fileSize - totalBytesReceived);
+                var bytesRead = await stream.ReadAsync(buffer, 0, bytesToRead, cts.Token);
 
                 if (bytesRead == 0)
                     break;
 
-                await stream.WriteAsync(buffer, 0, bytesRead, cts.Token);
-                totalBytesSent += bytesRead;
+                await fileStream.WriteAsync(buffer, 0, bytesRead, cts.Token);
+                totalBytesReceived += bytesRead;
 
                 // Log progress mỗi 10%
                 if (fileSize > 0)
                 {
-                    var progress = (double)totalBytesSent / fileSize * 100;
-                    if (totalBytesSent % (fileSize / 10 + 1) == 0 || totalBytesSent == fileSize)
+                    var progress = (double)totalBytesReceived / fileSize * 100;
+                    if (totalBytesReceived % (fileSize / 10 + 1) == 0 || totalBytesReceived == fileSize)
                     {
                         var elapsed = DateTime.UtcNow - startTime;
-                        var speed = totalBytesSent / elapsed.TotalSeconds / (1024 * 1024); // MB/s
-                        _logger.LogInfo($"Sending to {remoteEndPoint}: {progress:F1}% ({totalBytesSent}/{fileSize} bytes, {speed:F2} MB/s)");
+                        var speed = totalBytesReceived / elapsed.TotalSeconds / (1024 * 1024);
+                        Console.WriteLine($"  Progress: {progress:F1}% ({totalBytesReceived}/{fileSize} bytes, {speed:F2} MB/s)");
                     }
                 }
             }
 
-            await stream.FlushAsync(cts.Token);
+            await fileStream.FlushAsync(cts.Token);
 
-            if (totalBytesSent != fileSize)
+            if (totalBytesReceived != fileSize)
             {
-                _logger.LogError($"File transfer incomplete to {remoteEndPoint}: sent {totalBytesSent}/{fileSize} bytes");
+                Console.WriteLine($"\n✗ File transfer incomplete: received {totalBytesReceived}/{fileSize} bytes");
+                _logger.LogError($"File transfer incomplete from {remoteEndPoint}: received {totalBytesReceived}/{fileSize} bytes");
+                File.Delete(savePath); // Xóa file không hoàn chỉnh
             }
             else
             {
+                // Verify checksum
+                bool checksumValid = true;
+                if (!string.IsNullOrEmpty(checksum))
+                {
+                    var receivedChecksum = await ChecksumCalculator.CalculateSHA256Async(savePath);
+                    checksumValid = string.Equals(checksum, receivedChecksum, StringComparison.OrdinalIgnoreCase);
+                    
+                    if (checksumValid)
+                    {
+                        Console.WriteLine($"\n✓ File received successfully!");
+                        Console.WriteLine($"✓ Checksum verification: PASSED");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"\n✗ Checksum verification: FAILED");
+                        Console.WriteLine($"  Expected: {checksum}");
+                        Console.WriteLine($"  Received: {receivedChecksum}");
+                    }
+                }
+
                 var transferTime = DateTime.UtcNow - startTime;
-                var throughput = fileSize / transferTime.TotalSeconds / (1024 * 1024); // MB/s
-                _logger.LogInfo($"File transfer completed to {remoteEndPoint}: {fileName} ({fileSize} bytes) in {transferTime.TotalSeconds:F2}s ({throughput:F2} MB/s)");
+                var throughput = fileSize / transferTime.TotalSeconds / (1024 * 1024);
+                Console.WriteLine($"  Saved to: {savePath}");
+                Console.WriteLine($"  Transfer time: {transferTime.TotalSeconds:F2}s ({throughput:F2} MB/s)");
+                Console.WriteLine("═══════════════════════════════════════════════════════");
+                Console.WriteLine();
+                
+                _logger.LogInfo($"File transfer completed from {remoteEndPoint}: {fileName} ({fileSize} bytes) in {transferTime.TotalSeconds:F2}s ({throughput:F2} MB/s)");
             }
         }
         catch (OperationCanceledException)
@@ -474,6 +530,19 @@ public class FileTransferManager
         {
             _logger.LogError($"Error stopping file receiver: {ex.Message}", ex);
         }
+    }
+
+    private static string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len /= 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
     }
 }
 
