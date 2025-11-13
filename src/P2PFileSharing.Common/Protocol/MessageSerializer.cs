@@ -92,13 +92,14 @@ public static class MessageSerializer
     {
         return messageType switch
         {
-            MessageType.Register => JsonSerializer.Deserialize<RegisterMessage>(dataElement.GetRawText(), JsonOptions),
-            MessageType.RegisterAck => JsonSerializer.Deserialize<RegisterAckMessage>(dataElement.GetRawText(), JsonOptions),
-            MessageType.QueryPeers => JsonSerializer.Deserialize<QueryMessage>(dataElement.GetRawText(), JsonOptions),
+            MessageType.Register      => JsonSerializer.Deserialize<RegisterMessage>(dataElement.GetRawText(), JsonOptions),
+            MessageType.RegisterAck   => JsonSerializer.Deserialize<RegisterAckMessage>(dataElement.GetRawText(), JsonOptions),
+            MessageType.RegisterNack  => JsonSerializer.Deserialize<RegisterNackMessage>(dataElement.GetRawText(), JsonOptions), // ✅ MỚI
+            MessageType.QueryPeers    => JsonSerializer.Deserialize<QueryMessage>(dataElement.GetRawText(), JsonOptions),
             MessageType.QueryResponse => JsonSerializer.Deserialize<QueryResponseMessage>(dataElement.GetRawText(), JsonOptions),
-            MessageType.Deregister => JsonSerializer.Deserialize<DeregisterMessage>(dataElement.GetRawText(), JsonOptions),
-            MessageType.Heartbeat => JsonSerializer.Deserialize<HeartbeatMessage>(dataElement.GetRawText(), JsonOptions),
-            MessageType.FileTransferRequest => JsonSerializer.Deserialize<FileTransferRequestMessage>(dataElement.GetRawText(), JsonOptions),
+            MessageType.Deregister    => JsonSerializer.Deserialize<DeregisterMessage>(dataElement.GetRawText(), JsonOptions),
+            MessageType.Heartbeat     => JsonSerializer.Deserialize<HeartbeatMessage>(dataElement.GetRawText(), JsonOptions),
+            MessageType.FileTransferRequest  => JsonSerializer.Deserialize<FileTransferRequestMessage>(dataElement.GetRawText(), JsonOptions),
             MessageType.FileTransferResponse => JsonSerializer.Deserialize<FileTransferResponseMessage>(dataElement.GetRawText(), JsonOptions),
             _ => null
         };

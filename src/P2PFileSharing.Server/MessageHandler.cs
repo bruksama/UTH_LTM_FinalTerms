@@ -28,13 +28,28 @@ public static class MessageHandler
                 logger.LogDebug($"Received message: {message.Type}");
 
                 // Handle message based on type
-                Message? response = message.Type switch
+                Message? response = null;
+                switch (message.Type)
                 {
-                    MessageType.Register => await HandleRegisterAsync((RegisterMessage)message, peerRegistry, logger),
-                    MessageType.QueryPeers => await HandleQueryAsync((QueryMessage)message, peerRegistry, logger),
-                    MessageType.Deregister => await HandleDeregisterAsync((DeregisterMessage)message, peerRegistry, logger),
-                    MessageType.Heartbeat => await HandleHeartbeatAsync((HeartbeatMessage)message, peerRegistry, logger),
-                    _ => null
+                    case MessageType.Register:
+                        response = await HandleRegisterAsync((RegisterMessage)message, peerRegistry, logger);
+                        break;
+
+                    case MessageType.QueryPeers:
+                        response = await HandleQueryAsync((QueryMessage)message, peerRegistry, logger);
+                        break;
+
+                    case MessageType.Deregister:
+                        response = await HandleDeregisterAsync((DeregisterMessage)message, peerRegistry, logger);
+                        break;
+
+                    case MessageType.Heartbeat:
+                        response = await HandleHeartbeatAsync((HeartbeatMessage)message, peerRegistry, logger);
+                        break;
+
+                    default:
+                        logger.LogWarning($"Unsupported message type: {message.Type}");
+                        break;
                 };
 
                 // Send response if any
@@ -53,14 +68,26 @@ public static class MessageHandler
     private static async Task<Message?> HandleRegisterAsync(RegisterMessage message, PeerRegistry peerRegistry, ILogger logger)
     {
         await Task.Yield();
-        // TODO: Implement registration logic
-       var ok = peerRegistry.RegisterPeer(message.PeerInfo);
-        logger.LogInfo(ok
-            ? $"Register OK: {message.PeerInfo.Username} ({message.PeerInfo.IpAddress}:{message.PeerInfo.ListenPort})"
-            : $"Register FAIL: {message.PeerInfo.Username}");
 
-        // Theo khuôn lớp message của bạn: ack trả về PeerId
-        return new RegisterAckMessage { PeerId = message.PeerInfo.PeerId };
+        var ok = peerRegistry.RegisterPeer(message.PeerInfo);
+
+        if (ok)
+        {
+            logger.LogInfo(
+                $"Register OK: {message.PeerInfo.Username} ({message.PeerInfo.IpAddress}:{message.PeerInfo.ListenPort})");
+            return new RegisterAckMessage
+            {
+                PeerId = message.PeerInfo.PeerId
+            };
+        }
+        else
+        {
+            logger.LogInfo($"Register FAIL: {message.PeerInfo.Username}");
+            return new RegisterNackMessage
+            {
+                Reason = "Validation failed or server reached MaxPeers"
+            };
+        }
     }
 
     private static async Task<Message?> HandleQueryAsync(QueryMessage message, PeerRegistry peerRegistry, ILogger logger)

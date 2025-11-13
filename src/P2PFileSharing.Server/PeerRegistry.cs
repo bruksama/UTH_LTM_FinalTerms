@@ -5,6 +5,8 @@ using P2PFileSharing.Common.Models;
 using System.Reflection;
 using System.Linq;
 using System;
+using System.Net;   // để dùng IPAddress.TryParse
+
 
 namespace P2PFileSharing.Server;
 
@@ -49,6 +51,17 @@ public class PeerRegistry
             _logger.LogInfo("RegisterPeer: username is empty");
             return false;
         }
+        if (string.IsNullOrWhiteSpace(peerInfo.IpAddress))
+        {
+            _logger.LogInfo("RegisterPeer: IpAddress is empty");
+            return false;
+        }
+
+        if (!IPAddress.TryParse(peerInfo.IpAddress, out _))
+        {
+            _logger.LogInfo($"RegisterPeer: invalid IpAddress={peerInfo.IpAddress}");
+            return false;
+        }
         if (peerInfo.ListenPort < 0 || peerInfo.ListenPort > 65535)
         {
             _logger.LogInfo($"RegisterPeer: invalid ListenPort={peerInfo.ListenPort} for [{peerInfo.Username}]");
@@ -81,10 +94,11 @@ public class PeerRegistry
                     IpAddress   = peerInfo.IpAddress,
                     ListenPort  = peerInfo.ListenPort,
                     SharedFiles = peerInfo.SharedFiles, // có thể rỗng
-                    LastSeen    = now
+                    LastSeen    = now,
+                    PeerId      = peerInfo.PeerId
                 };
             },
-             (_, existing) =>
+            updateValueFactory: (_, existing) =>
             {
                 // Tạo mới thay vì mutate để an toàn nếu model có init;
                 return new PeerInfo
@@ -93,7 +107,8 @@ public class PeerRegistry
                     IpAddress   = peerInfo.IpAddress,
                     ListenPort  = peerInfo.ListenPort,
                     SharedFiles = peerInfo.SharedFiles ?? existing.SharedFiles,
-                    LastSeen    = now
+                    LastSeen    = now,
+                    PeerId      = existing.PeerId 
                 };
             }
         );
@@ -220,18 +235,11 @@ public class PeerRegistry
     {
         // Dùng reflection để linh hoạt theo tên thuộc tính cấu hình khác nhau giữa các nhóm
         // Ưu tiên: HeartbeatTimeoutSeconds, PeerTimeoutSeconds
-       try
-        {
-            var hb = TryGetIntConfig(cfg, "HeartbeatTimeoutSeconds");
-            var pt = TryGetIntConfig(cfg, "PeerTimeoutSeconds");
-            var seconds = hb ?? pt ?? DefaultPeerTimeoutSeconds;
-            if (seconds <= 0) seconds = DefaultPeerTimeoutSeconds;
-            return TimeSpan.FromSeconds(seconds);
-        }
-        catch
-        {
-            return TimeSpan.FromSeconds(DefaultPeerTimeoutSeconds);
-        }
+        if (cfg.PeerTimeout > TimeSpan.Zero)
+        return cfg.PeerTimeout;
+
+    // fallback nếu cấu hình bị lỗi
+        return TimeSpan.FromSeconds(DefaultPeerTimeoutSeconds);
     }
     
     private static int? TryGetIntConfig(ServerConfig cfg, string name)
