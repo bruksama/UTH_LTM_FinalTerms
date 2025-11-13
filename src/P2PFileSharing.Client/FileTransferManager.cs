@@ -654,4 +654,3 @@ public class FileTransferManager
         return $"{len:0.##} {sizes[order]}";
     }
 }
-
