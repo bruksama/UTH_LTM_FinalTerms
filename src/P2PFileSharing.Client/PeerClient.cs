@@ -11,14 +11,17 @@ namespace P2PFileSharing.Client;
 /// </summary>
 public class PeerClient
 {
+    private readonly ClientConfig _config;
     private readonly ILogger _logger;
     private readonly ServerCommunicator _serverCommunicator;
     private readonly UdpDiscovery _udpDiscovery;
     private readonly FileTransferManager _fileTransferManager;
     private bool _isRunning;
+    private PeerInfo? _currentPeerInfo;
 
     public PeerClient(ClientConfig config, ILogger logger)
     {
+        _config = config;
         _logger = logger;
         _serverCommunicator = new ServerCommunicator(config, logger);
         _udpDiscovery = new UdpDiscovery(config, logger);
@@ -34,28 +37,48 @@ public class PeerClient
 
         _isRunning = true;
 
-        // TODO: 1. Register with server via _serverCommunicator
-        // TODO: 2. Start P2P listener (FileTransferManager)
-        // TODO: 3. Start heartbeat task
-        
-        // Start file receiver để nhận file từ peers khác
+        // Start file receiver để nhận file từ peers khác (phải start trước để có port thực tế)
         _fileTransferManager.StartReceiver();
         
-        if (_udpDiscovery.LocalPeerProvider == null)
+        // Lấy port thực tế đang được sử dụng
+        var actualListenPort = _fileTransferManager.GetActualListenPort();
+        
+        // Tạo PeerInfo với thông tin đầy đủ
+        _currentPeerInfo = new PeerInfo
         {
-            _udpDiscovery.LocalPeerProvider = () => new PeerInfo
-            {
-                Username   = Environment.UserName,
-                IpAddress  = NetworkHelper.GetLocalIPAddress(),
-                ListenPort = NetworkHelper.FindAvailablePort(5050, 5999),
-                LastSeen   = DateTime.UtcNow,
-                PeerId     = Guid.NewGuid().ToString()
-            };
-        }
+            Username = _config.Username,
+            IpAddress = NetworkHelper.GetLocalIPAddress(),
+            ListenPort = actualListenPort,
+            LastSeen = DateTime.UtcNow,
+            PeerId = Guid.NewGuid().ToString(),
+            SharedFiles = GetSharedFiles()
+        };
+
+        // Setup UDP Discovery LocalPeerProvider với port thực tế
+        _udpDiscovery.LocalPeerProvider = () => new PeerInfo
+        {
+            Username = _currentPeerInfo.Username,
+            IpAddress = _currentPeerInfo.IpAddress,
+            ListenPort = _currentPeerInfo.ListenPort,
+            LastSeen = DateTime.UtcNow,
+            PeerId = _currentPeerInfo.PeerId,
+            SharedFiles = _currentPeerInfo.SharedFiles
+        };
 
         _udpDiscovery.StartListener();
 
-        _logger.LogInfo("PeerClient started (discovery listener running; server registration TODO).");
+        // Đăng ký với server
+        var registered = await _serverCommunicator.RegisterAsync(_currentPeerInfo);
+        if (registered)
+        {
+            _logger.LogInfo($"Successfully registered with server as {_currentPeerInfo.Username} on {_currentPeerInfo.IpAddress}:{_currentPeerInfo.ListenPort}");
+        }
+        else
+        {
+            _logger.LogWarning("Failed to register with server, but continuing anyway (UDP discovery still works)");
+        }
+
+        _logger.LogInfo($"PeerClient started. Listen Port: {actualListenPort}");
         await Task.CompletedTask;
     }
 
@@ -68,10 +91,13 @@ public class PeerClient
 
         _isRunning = false;
 
-        // TODO: 1. Deregister from server
-        // TODO: 2. Stop P2P listener
-        // TODO: 3. Cleanup other resources
+        // Hủy đăng ký với server
+        if (_currentPeerInfo != null && !string.IsNullOrEmpty(_currentPeerInfo.PeerId))
+        {
+            await _serverCommunicator.DeregisterAsync(_currentPeerInfo.PeerId);
+        }
 
+        // Stop P2P listener
         _fileTransferManager.StopReceiver();
         _udpDiscovery.StopListener();
 
@@ -86,15 +112,18 @@ public class PeerClient
     {
         try
         {
+            // Đảm bảo LocalPeerProvider được setup với port thực tế
             if (_udpDiscovery.LocalPeerProvider == null)
             {
+                var actualPort = _fileTransferManager.GetActualListenPort();
                 _udpDiscovery.LocalPeerProvider = () => new PeerInfo
                 {
-                    Username   = Environment.UserName,
-                    IpAddress  = NetworkHelper.GetLocalIPAddress(),
-                    ListenPort = NetworkHelper.FindAvailablePort(5050, 5999),
-                    LastSeen   = DateTime.UtcNow,
-                    PeerId     = Guid.NewGuid().ToString()
+                    Username = _config.Username,
+                    IpAddress = NetworkHelper.GetLocalIPAddress(),
+                    ListenPort = actualPort,
+                    LastSeen = DateTime.UtcNow,
+                    PeerId = _currentPeerInfo?.PeerId ?? Guid.NewGuid().ToString(),
+                    SharedFiles = GetSharedFiles()
                 };
             }
             
@@ -179,6 +208,45 @@ public class PeerClient
             _logger.LogError($"Error sending file to {peerName}: {ex.Message}", ex);
             return false;
         }
+    }
+
+    /// <summary>
+    /// Lấy danh sách file trong shared directory
+    /// </summary>
+    private List<Common.Models.SharedFile> GetSharedFiles()
+    {
+        var sharedFiles = new List<Common.Models.SharedFile>();
+        
+        try
+        {
+            if (Directory.Exists(_config.SharedDirectory))
+            {
+                var files = Directory.GetFiles(_config.SharedDirectory);
+                foreach (var filePath in files)
+                {
+                    try
+                    {
+                        var fileInfo = new FileInfo(filePath);
+                        sharedFiles.Add(new Common.Models.SharedFile
+                        {
+                            FileName = fileInfo.Name,
+                            FileSize = fileInfo.Length,
+                            FilePath = filePath
+                        });
+                    }
+                    catch
+                    {
+                        // Skip files that can't be accessed
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Error reading shared files: {ex.Message}");
+        }
+        
+        return sharedFiles;
     }
 
     public bool IsRunning => _isRunning;
