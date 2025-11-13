@@ -33,8 +33,10 @@ public class PeerClient
     /// </summary>
     public async Task StartAsync()
     {
+        // Kiểm tra và đợi nếu đang trong quá trình stop
         if (_isRunning) return;
 
+        // Set flag TRƯỚC khi bắt đầu operations để tránh concurrent starts
         _isRunning = true;
 
         // Start file receiver để nhận file từ peers khác (phải start trước để có port thực tế)
@@ -42,6 +44,14 @@ public class PeerClient
         
         // Lấy port thực tế đang được sử dụng
         var actualListenPort = _fileTransferManager.GetActualListenPort();
+        
+        // Kiểm tra receiver có start thành công không
+        if (actualListenPort == -1 || !_fileTransferManager.IsReceiverRunning)
+        {
+            _logger.LogError("File receiver failed to start. Cannot register with server.");
+            // Vẫn tiếp tục nhưng không đăng ký với server
+            actualListenPort = _config.ListenPort; // Fallback về config port
+        }
         
         // Tạo PeerInfo với thông tin đầy đủ
         _currentPeerInfo = new PeerInfo
@@ -67,15 +77,22 @@ public class PeerClient
 
         _udpDiscovery.StartListener();
 
-        // Đăng ký với server
-        var registered = await _serverCommunicator.RegisterAsync(_currentPeerInfo);
-        if (registered)
+        // Đăng ký với server (chỉ khi receiver đã start thành công)
+        if (_fileTransferManager.IsReceiverRunning && actualListenPort > 0)
         {
-            _logger.LogInfo($"Successfully registered with server as {_currentPeerInfo.Username} on {_currentPeerInfo.IpAddress}:{_currentPeerInfo.ListenPort}");
+            var registered = await _serverCommunicator.RegisterAsync(_currentPeerInfo);
+            if (registered)
+            {
+                _logger.LogInfo($"Successfully registered with server as {_currentPeerInfo.Username} on {_currentPeerInfo.IpAddress}:{_currentPeerInfo.ListenPort}");
+            }
+            else
+            {
+                _logger.LogWarning("Failed to register with server, but continuing anyway (UDP discovery still works)");
+            }
         }
         else
         {
-            _logger.LogWarning("Failed to register with server, but continuing anyway (UDP discovery still works)");
+            _logger.LogWarning("Cannot register with server: file receiver is not running");
         }
 
         _logger.LogInfo($"PeerClient started. Listen Port: {actualListenPort}");
@@ -89,8 +106,7 @@ public class PeerClient
     {
         if (!_isRunning) return;
 
-        _isRunning = false;
-
+        // Thực hiện cleanup TRƯỚC khi set _isRunning = false để tránh race condition
         // Hủy đăng ký với server
         if (_currentPeerInfo != null && !string.IsNullOrEmpty(_currentPeerInfo.PeerId))
         {
@@ -100,6 +116,9 @@ public class PeerClient
         // Stop P2P listener
         _fileTransferManager.StopReceiver();
         _udpDiscovery.StopListener();
+
+        // Set _isRunning = false SAU KHI tất cả cleanup operations hoàn thành
+        _isRunning = false;
 
         _logger.LogInfo("PeerClient stopped.");
         await Task.CompletedTask;
@@ -116,6 +135,11 @@ public class PeerClient
             if (_udpDiscovery.LocalPeerProvider == null)
             {
                 var actualPort = _fileTransferManager.GetActualListenPort();
+                // Nếu receiver không chạy, dùng port từ config
+                if (actualPort == -1)
+                {
+                    actualPort = _config.ListenPort;
+                }
                 _udpDiscovery.LocalPeerProvider = () => new PeerInfo
                 {
                     Username = _config.Username,
