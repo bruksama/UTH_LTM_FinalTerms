@@ -1,3 +1,6 @@
+/*using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;*/
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 using P2PFileSharing.Common.Models;
@@ -6,7 +9,7 @@ namespace P2PFileSharing.Client.GUI.ViewModels;
 
 /// <summary>
 /// ViewModel cho một Peer item trong danh sách
-/// TODO: Implement peer information display and file sharing functionality
+/// Hiển thị thông tin peer và hỗ trợ gửi file tới peer đó.
 /// </summary>
 public class PeerViewModel : BaseViewModel
 {
@@ -18,32 +21,43 @@ public class PeerViewModel : BaseViewModel
     {
         _peerInfo = peerInfo;
         SharedFiles = new ObservableCollection<SharedFileViewModel>();
-        
-        // TODO: Initialize SharedFiles from peerInfo.SharedFiles
-        
-        // TODO: Initialize commands
-        SendFileCommand = new RelayCommand(async (param) => 
+
+        // Khởi tạo SharedFiles từ PeerInfo.SharedFiles
+        if (peerInfo.SharedFiles != null)
         {
-            if (param is string filePath)
-                await SendFileAsync(filePath);
-        });
+            foreach (var file in peerInfo.SharedFiles)
+            {
+                SharedFiles.Add(new SharedFileViewModel(file));
+            }
+        }
+
+        // Khởi tạo IsOnline dựa trên LastSeen
+        _isOnline = peerInfo.IsOnline(TimeSpan.FromMinutes(5));
+        _status = _isOnline ? "Online" : "Offline";
+
+        // Command gửi file
+        SendFileCommand = new RelayCommand(
+            async param =>
+            {
+                if (param is string filePath)
+                    await SendFileAsync(filePath);
+            });
     }
+
+    #region Properties
 
     /// <summary>
     /// Username của peer
-    /// TODO: Bind to UI
     /// </summary>
     public string Username => _peerInfo.Username;
 
     /// <summary>
-    /// Địa chỉ IP và Port của peer
-    /// TODO: Format as "IP:Port" and bind to UI
+    /// Địa chỉ IP và Port của peer (format "IP:Port")
     /// </summary>
     public string Address => $"{_peerInfo.IpAddress}:{_peerInfo.ListenPort}";
 
     /// <summary>
     /// Trạng thái online/offline
-    /// TODO: Update based on LastSeen and timeout
     /// </summary>
     public bool IsOnline
     {
@@ -53,7 +67,6 @@ public class PeerViewModel : BaseViewModel
 
     /// <summary>
     /// Status text hiển thị trên UI
-    /// TODO: Update based on connection status
     /// </summary>
     public string Status
     {
@@ -63,52 +76,75 @@ public class PeerViewModel : BaseViewModel
 
     /// <summary>
     /// Danh sách file mà peer đang chia sẻ
-    /// TODO: Populate from PeerInfo.SharedFiles
     /// </summary>
     public ObservableCollection<SharedFileViewModel> SharedFiles { get; }
 
     /// <summary>
     /// Command để gửi file đến peer này
-    /// TODO: Implement file sending logic
     /// </summary>
     public ICommand SendFileCommand { get; }
 
+    #endregion
+
+    #region Methods
+
     /// <summary>
     /// Gửi file đến peer này
-    /// TODO: Integrate with FileTransferManager.SendFileAsync()
-    /// TODO: Show progress dialog
-    /// TODO: Handle errors and show notifications
+    /// TODO: tích hợp FileTransferManager.SendFileAsync(...) thực tế
     /// </summary>
     public async Task<bool> SendFileAsync(string filePath)
     {
-        // TODO: Validate file exists
-        // TODO: Call FileTransferManager.SendFileAsync(_peerInfo.IpAddress, _peerInfo.ListenPort, filePath)
-        // TODO: Update UI with transfer progress
-        // TODO: Return success/failure
-        await Task.CompletedTask;
-        return false;
+        try
+        {
+            if (!System.IO.File.Exists(filePath))
+                return false;
+
+            // TODO: Call FileTransferManager.SendFileAsync(_peerInfo.IpAddress, _peerInfo.ListenPort, filePath)
+            // Hiện tại mô phỏng transfer cho mục đích test GUI
+            await Task.Delay(1000);
+
+            return true; // Placeholder: sau này trả về kết quả thực
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     /// <summary>
     /// Gửi nhiều file cùng lúc
-    /// TODO: Implement batch file sending
     /// </summary>
     public async Task SendFilesAsync(IEnumerable<string> filePaths)
     {
-        // TODO: Iterate through files and send each one
-        // TODO: Show overall progress
-        await Task.CompletedTask;
+        foreach (var filePath in filePaths)
+        {
+            await SendFileAsync(filePath);
+        }
     }
 
     /// <summary>
-    /// Cập nhật thông tin peer từ PeerInfo mới
-    /// TODO: Update properties when peer info changes
+    /// Cập nhật thông tin peer từ PeerInfo mới (khi refresh/scan)
     /// </summary>
     public void UpdateFromPeerInfo(PeerInfo peerInfo)
     {
-        // TODO: Update all properties from new PeerInfo
-        // TODO: Update SharedFiles collection
-        // TODO: Raise PropertyChanged events
-    }
-}
+        // Update online status
+        IsOnline = peerInfo.IsOnline(TimeSpan.FromMinutes(5));
+        Status = IsOnline ? "Online" : "Offline";
 
+        // Update shared files
+        SharedFiles.Clear();
+        if (peerInfo.SharedFiles != null)
+        {
+            foreach (var file in peerInfo.SharedFiles)
+            {
+                SharedFiles.Add(new SharedFileViewModel(file));
+            }
+        }
+
+        // Notify UI cập nhật lại address/username nếu thay đổi
+        OnPropertyChanged(nameof(Username));
+        OnPropertyChanged(nameof(Address));
+    }
+
+    #endregion
+}
