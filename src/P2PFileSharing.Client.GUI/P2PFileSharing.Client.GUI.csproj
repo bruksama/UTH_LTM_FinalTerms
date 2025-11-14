@@ -9,7 +9,9 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\P2PFileSharing.Client\P2PFileSharing.Client.csproj" />
         <ProjectReference Include="..\P2PFileSharing.Common\P2PFileSharing.Common.csproj" />
+        <ProjectReference Include="..\P2PFileSharing.Server\P2PFileSharing.Server.csproj" />
     </ItemGroup>
 
 </Project>

@@ -1,85 +1,125 @@
+using System;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using P2PFileSharing.Client.GUI.ViewModels;
 
 namespace P2PFileSharing.Client.GUI.Views;
 
 /// <summary>
 /// Interaction logic for PeerItemControl.xaml
-/// TODO: Implement drag & drop handlers for file transfer
+/// Xử lý drag & drop để gửi file cho peer
 /// </summary>
 public partial class PeerItemControl : UserControl
 {
     public PeerItemControl()
     {
         InitializeComponent();
-        
-        // TODO: Subscribe to drag & drop events
-        this.DragOver += OnDragOver;
-        this.Drop += OnDrop;
+
+        // Cho phép drop trên toàn control
+        AllowDrop = true;
+
+        DragEnter += OnDragEnter;
+        DragLeave += OnDragLeave;
+        DragOver  += OnDragOver;
+        Drop      += OnDrop;
     }
 
     /// <summary>
     /// Xử lý khi file được drag over control
-    /// TODO: Validate file types and show visual feedback
     /// </summary>
-    private void OnDragOver(object sender, System.Windows.DragEventArgs e)
+    private void OnDragOver(object sender, DragEventArgs e)
     {
-        // TODO: Check if data contains files
-        if (e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop))
+        if (e.Data.GetDataPresent(DataFormats.FileDrop))
         {
-            e.Effects = System.Windows.DragDropEffects.Copy;
-            e.Handled = true;
-            
-            // TODO: Change border color to indicate valid drop zone
+            e.Effects = DragDropEffects.Copy;
         }
         else
         {
-            e.Effects = System.Windows.DragDropEffects.None;
-            e.Handled = true;
+            e.Effects = DragDropEffects.None;
         }
-    }
 
-    /// <summary>
-    /// Xử lý khi file được drop vào control
-    /// TODO: Extract file paths and trigger file transfer
-    /// </summary>
-    private async void OnDrop(object sender, System.Windows.DragEventArgs e)
-    {
-        // TODO: Get dropped files
-        if (e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop))
-        {
-            string[] files = (string[])e.Data.GetData(System.Windows.DataFormats.FileDrop);
-            var peerViewModel = DataContext as PeerViewModel;
-            
-            if (peerViewModel != null && files != null && files.Length > 0)
-            {
-                // TODO: Call MainViewModel.HandleFileDropAsync() or peerViewModel.SendFilesAsync()
-                // TODO: Show progress indicator
-                // TODO: Handle errors
-                await peerViewModel.SendFilesAsync(files);
-            }
-        }
-        
         e.Handled = true;
     }
 
     /// <summary>
-    /// Xử lý khi drag enter (optional - for visual feedback)
-    /// TODO: Change appearance when dragging over
+    /// Xử lý khi file được drop vào control
     /// </summary>
-    private void OnDragEnter(object sender, System.Windows.DragEventArgs e)
+    private async void OnDrop(object sender, DragEventArgs e)
     {
-        // TODO: Highlight drop zone
+        try
+        {
+            if (!e.Data.GetDataPresent(DataFormats.FileDrop))
+                return;
+
+            var files = e.Data.GetData(DataFormats.FileDrop) as string[];
+            if (files is not { Length: > 0 })
+                return;
+
+            // VM của từng peer
+            if (DataContext is not PeerViewModel peerVm)
+                return;
+
+            // Lấy MainViewModel từ MainWindow để nó quản lý Transfer list
+            if (Application.Current.MainWindow?.DataContext is MainViewModel mainVm)
+            {
+                await mainVm.HandleFileDropAsync(peerVm, files);
+            }
+            else
+            {
+                // Fallback: gửi trực tiếp qua PeerViewModel
+                await peerVm.SendFilesAsync(files);
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error dropping files: {ex.Message}",
+                "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            ResetHighlight();
+            e.Handled = true;
+        }
     }
 
     /// <summary>
-    /// Xử lý khi drag leave (optional - for visual feedback)
-    /// TODO: Restore normal appearance
+    /// Drag enter – đổi màu để user thấy vùng drop hợp lệ
     /// </summary>
-    private void OnDragLeave(object sender, System.Windows.DragEventArgs e)
+    private void OnDragEnter(object sender, DragEventArgs e)
     {
-        // TODO: Remove highlight
+        if (!e.Data.GetDataPresent(DataFormats.FileDrop))
+            return;
+
+        SetHighlight();
+        e.Handled = true;
+    }
+
+    /// <summary>
+    /// Drag leave – trả UI về bình thường
+    /// </summary>
+    private void OnDragLeave(object sender, DragEventArgs e)
+    {
+        ResetHighlight();
+        e.Handled = true;
+    }
+
+    private void SetHighlight()
+    {
+        // Nhớ thêm x:Name="DropZoneBorder" cho Border drop zone trong XAML
+        if (FindName("DropZoneBorder") is Border border)
+        {
+            border.BorderBrush = Brushes.DodgerBlue;
+            border.Background  = new SolidColorBrush(Color.FromArgb(40, 30, 144, 255));
+        }
+    }
+
+    private void ResetHighlight()
+    {
+        if (FindName("DropZoneBorder") is Border border)
+        {
+            border.BorderBrush = Brushes.Blue;
+            border.Background  = Brushes.LightBlue;
+        }
     }
 }
-

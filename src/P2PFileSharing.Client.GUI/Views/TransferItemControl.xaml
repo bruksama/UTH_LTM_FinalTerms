@@ -4,36 +4,113 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
-             d:DesignHeight="80" d:DesignWidth="600">
-    <Border BorderBrush="LightGray" 
-            BorderThickness="1" 
-            Margin="2" 
+             d:DesignHeight="80"
+             d:DesignWidth="600">
+    <UserControl.Resources>
+        <!-- Brush cho trạng thái Completed / Failed / Default -->
+        <SolidColorBrush x:Key="TransferNormalBrush" Color="#FF2196F3"/>
+        <SolidColorBrush x:Key="TransferCompletedBrush" Color="#FF4CAF50"/>
+        <SolidColorBrush x:Key="TransferFailedBrush" Color="#FFF44336"/>
+
+        <!-- Converter nhỏ bằng DataTrigger nên tạm dùng luôn Trigger, không cần class riêng -->
+        <Style x:Key="StatusTextStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="Gray"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsCompleted}" Value="True">
+                    <Setter Property="Foreground" Value="#FF4CAF50"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsFailed}" Value="True">
+                    <Setter Property="Foreground" Value="#FFF44336"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="ProgressBarStyle" TargetType="ProgressBar">
+            <Setter Property="Height" Value="16"/>
+            <Setter Property="Foreground" Value="{StaticResource TransferNormalBrush}"/>
+            <Setter Property="Background" Value="#FFE0E0E0"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsCompleted}" Value="True">
+                    <Setter Property="Foreground" Value="{StaticResource TransferCompletedBrush}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsFailed}" Value="True">
+                    <Setter Property="Foreground" Value="{StaticResource TransferFailedBrush}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <Border Margin="4"
             Padding="10"
-            Background="White">
-        <StackPanel>
-            <!-- TODO: Bind to TransferViewModel properties -->
-            <!-- File Name and Peer -->
-            <StackPanel Orientation="Horizontal">
-                <TextBlock Text="→" FontSize="16" Margin="0,0,5,0"/>
-                <TextBlock Text="{Binding FileName}" FontWeight="SemiBold"/>
-                <TextBlock Text=" → " Margin="5,0"/>
-                <TextBlock Text="{Binding PeerName}" Foreground="Blue"/>
+            CornerRadius="8"
+            Background="White"
+            BorderBrush="#22000000"
+            BorderThickness="1"
+            SnapsToDevicePixels="True">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Dòng 1: icon + FileName + Peer -->
+            <StackPanel Grid.Row="0"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center">
+                <TextBlock Text="⏬"
+                           FontSize="18"
+                           Margin="0,0,6,0"/>
+                <TextBlock Text="{Binding FileName}"
+                           FontWeight="SemiBold"
+                           FontSize="13"/>
+                <TextBlock Text="  →  "
+                           Margin="6,0,0,0"
+                           Foreground="Gray"/>
+                <TextBlock Text="{Binding PeerName}"
+                           FontSize="13"
+                           Foreground="#FF2196F3"/>
             </StackPanel>
 
-            <!-- Progress Bar -->
-            <ProgressBar Value="{Binding Progress}" 
-                        Height="20" 
-                        Margin="0,5,0,5"
-                        Minimum="0"
-                        Maximum="100"/>
+            <!-- Dòng 2: Progress bar + phần trăm -->
+            <Grid Grid.Row="1" Margin="0,6,0,2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
-            <!-- Status and Speed -->
-            <StackPanel Orientation="Horizontal">
-                <TextBlock Text="{Binding Status}" FontSize="11" Foreground="Gray"/>
-                <TextBlock Text=" - " Margin="5,0"/>
-                <TextBlock Text="{Binding Speed}" FontSize="11" Foreground="DarkGreen"/>
+                <ProgressBar Grid.Column="0"
+                             Style="{StaticResource ProgressBarStyle}"
+                             Minimum="0"
+                             Maximum="100"
+                             Value="{Binding Progress}"/>
+
+                <TextBlock Grid.Column="1"
+                           Margin="8,0,0,0"
+                           VerticalAlignment="Center"
+                           FontSize="11"
+                           Foreground="Gray"
+                           Text="{Binding Progress, StringFormat={}{0:F0}%}"/>
+            </Grid>
+
+            <!-- Dòng 3: Status + Speed -->
+            <StackPanel Grid.Row="2"
+                        Orientation="Horizontal"
+                        Margin="0,2,0,0">
+                <TextBlock Text="{Binding Status}"
+                           Style="{StaticResource StatusTextStyle}"
+                           FontSize="11"/>
+
+                <TextBlock Text=" • "
+                           Margin="4,0"
+                           FontSize="11"
+                           Foreground="Gray"/>
+
+                <TextBlock Text="{Binding Speed}"
+                           FontSize="11"
+                           Foreground="DarkGreen"/>
             </StackPanel>
-        </StackPanel>
+        </Grid>
     </Border>
 </UserControl>
-
