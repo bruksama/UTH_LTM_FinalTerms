@@ -198,10 +198,62 @@ public class ServerCommunicator
     /// </summary>
     public async Task<bool> DeregisterAsync(string peerId)
     {
-        // TODO: Implement deregistration
-        _logger.LogInfo($"TODO: Deregister peer {peerId} from server");
-        await Task.CompletedTask;
-        return false;
+        if (string.IsNullOrWhiteSpace(peerId))
+            return false;
+
+        try
+        {
+            using var client = new System.Net.Sockets.TcpClient();
+
+            var timeoutMs = (int)P2PFileSharing.Common.Protocol.ProtocolConstants.ConnectionTimeout.TotalMilliseconds;
+            var cts = new CancellationTokenSource(timeoutMs);
+
+            _logger.LogInfo($"Connecting to server {_config.ServerIpAddress}:{_config.ServerPort} to deregister...");
+
+            var connectTask = client.ConnectAsync(_config.ServerIpAddress, _config.ServerPort);
+            var timeoutTask = Task.Delay(timeoutMs, cts.Token);
+            var completed = await Task.WhenAny(connectTask, timeoutTask);
+
+            if (completed == timeoutTask || !client.Connected)
+            {
+                var errorMsg = completed == timeoutTask
+                    ? $"Connection timeout after {timeoutMs}ms"
+                    : "Connection failed";
+                _logger.LogInfo($"Deregister: {errorMsg} - Cannot connect to server {_config.ServerIpAddress}:{_config.ServerPort}");
+                _logger.LogInfo($"  Hãy kiểm tra:");
+                _logger.LogInfo($"  1. Server đã được khởi động chưa?");
+                _logger.LogInfo($"  2. IP address và port có đúng không?");
+                _logger.LogInfo($"  3. Firewall có chặn kết nối không?");
+                _logger.LogInfo($"  4. Cả hai máy có cùng mạng LAN không?");
+                return false;
+            }
+
+            using var stream = client.GetStream();
+
+            client.SendTimeout = (int)P2PFileSharing.Common.Protocol.ProtocolConstants.ReadWriteTimeout.TotalMilliseconds;
+            client.ReceiveTimeout = (int)P2PFileSharing.Common.Protocol.ProtocolConstants.ReadWriteTimeout.TotalMilliseconds;
+
+            var deregisterMessage = new DeregisterMessage
+            {
+                PeerId = peerId
+            };
+
+            await P2PFileSharing.Common.Protocol.MessageSerializer.SendMessageAsync(stream, deregisterMessage, cts.Token);
+
+            // Server doesn't send a response for deregistration; consider success if send succeeded
+            _logger.LogInfo($"Deregister: sent request for PeerId={peerId}");
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInfo("Deregister: connection timed out");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Deregister failed", ex);
+            return false;
+        }
     }
 
     /// <summary>
