@@ -4,7 +4,7 @@ namespace P2PFileSharing.Client.GUI.ViewModels;
 
 /// <summary>
 /// ViewModel cho một file được chia sẻ
-/// TODO: Implement file information display
+/// Dùng để hiển thị thông tin file trong GUI
 /// </summary>
 public class SharedFileViewModel : BaseViewModel
 {
@@ -17,13 +17,12 @@ public class SharedFileViewModel : BaseViewModel
 
     /// <summary>
     /// Tên file
-    /// TODO: Bind to UI
+    /// Bind trực tiếp ra UI
     /// </summary>
     public string FileName => _sharedFile.FileName;
 
     /// <summary>
-    /// Kích thước file (formatted)
-    /// TODO: Format bytes to human-readable format (KB, MB, GB)
+    /// Kích thước file (đã format, ví dụ: 12.3 MB)
     /// </summary>
     public string FileSize => FormatFileSize(_sharedFile.FileSize);
 
@@ -33,19 +32,26 @@ public class SharedFileViewModel : BaseViewModel
     public long FileSizeBytes => _sharedFile.FileSize;
 
     /// <summary>
-    /// Checksum của file
-    /// TODO: Display if needed
+    /// Checksum của file (nếu cần hiển thị chi tiết)
     /// </summary>
     public string Checksum => _sharedFile.Checksum;
 
     /// <summary>
-    /// Format file size to human-readable string
-    /// TODO: Implement formatting logic
+    /// Format file size: B, KB, MB, GB
     /// </summary>
     private static string FormatFileSize(long bytes)
     {
-        // TODO: Implement KB, MB, GB formatting
-        return $"{bytes} bytes";
+        const double KB = 1024.0;
+        const double MB = KB * 1024.0;
+        const double GB = MB * 1024.0;
+
+        if (bytes < KB)
+            return $"{bytes} B";
+        if (bytes < MB)
+            return $"{bytes / KB:0.##} KB";
+        if (bytes < GB)
+            return $"{bytes / MB:0.##} MB";
+
+        return $"{bytes / GB:0.##} GB";
     }
 }
-
