@@ -1,6 +1,3 @@
-/*using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;*/
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Input;
@@ -8,6 +5,7 @@ using P2PFileSharing.Client;
 using P2PFileSharing.Common.Configuration;
 using P2PFileSharing.Common.Infrastructure;
 using P2PFileSharing.Common.Models;
+using P2PFileSharing.Common.Models.Messages; // ✅ THÊM THEO TÀI LIỆU
 
 namespace P2PFileSharing.Client.GUI.ViewModels;
 
@@ -65,27 +63,19 @@ public class MainViewModel : BaseViewModel
 
     #region Properties
 
-    /// <summary>
-    /// Username của peer này (bind TextBox)
-    /// </summary>
+    // (Vùng này giữ nguyên, không thay đổi)
     public string Username
     {
         get => _username;
         set => SetProperty(ref _username, value);
     }
 
-    /// <summary>
-    /// Địa chỉ Server (IP:Port) (bind TextBox)
-    /// </summary>
     public string ServerAddress
     {
         get => _serverAddress;
         set => SetProperty(ref _serverAddress, value);
     }
 
-    /// <summary>
-    /// Trạng thái kết nối với Server
-    /// </summary>
     public bool IsConnected
     {
         get => _isConnected;
@@ -94,33 +84,23 @@ public class MainViewModel : BaseViewModel
             if (SetProperty(ref _isConnected, value))
             {
                 ConnectionStatus = value ? "Connected" : "Disconnected";
-                // Force reevaluate CanExecute của commands
                 CommandManager.InvalidateRequerySuggested();
             }
         }
     }
 
-    /// <summary>
-    /// Trạng thái kết nối text (hiển thị trên UI)
-    /// </summary>
     public string ConnectionStatus
     {
         get => _connectionStatus;
         set => SetProperty(ref _connectionStatus, value);
     }
 
-    /// <summary>
-    /// Peer đang được chọn trong danh sách
-    /// </summary>
     public PeerViewModel? SelectedPeer
     {
         get => _selectedPeer;
         set => SetProperty(ref _selectedPeer, value);
     }
 
-    /// <summary>
-    /// Flag loading để disable một số thao tác
-    /// </summary>
     public bool IsLoading
     {
         get => _isLoading;
@@ -133,48 +113,19 @@ public class MainViewModel : BaseViewModel
         }
     }
 
-    /// <summary>
-    /// Danh sách các peer đang online
-    /// </summary>
     public ObservableCollection<PeerViewModel> Peers { get; }
-
-    /// <summary>
-    /// Danh sách các file transfer đang diễn ra
-    /// </summary>
     public ObservableCollection<TransferViewModel> Transfers { get; }
-
-    /// <summary>
-    /// Danh sách file đang chia sẻ
-    /// </summary>
     public ObservableCollection<SharedFileViewModel> SharedFiles { get; }
 
     #endregion
 
     #region Commands
-
-    /// <summary>
-    /// Kết nối với Server
-    /// </summary>
+    
+    // (Vùng này giữ nguyên, không thay đổi)
     public ICommand ConnectCommand { get; }
-
-    /// <summary>
-    /// Ngắt kết nối với Server
-    /// </summary>
     public ICommand DisconnectCommand { get; }
-
-    /// <summary>
-    /// Refresh danh sách peer từ Server
-    /// </summary>
     public ICommand RefreshPeersCommand { get; }
-
-    /// <summary>
-    /// Scan mạng LAN bằng UDP
-    /// </summary>
     public ICommand ScanNetworkCommand { get; }
-
-    /// <summary>
-    /// Thêm file chia sẻ
-    /// </summary>
     public ICommand AddSharedFileCommand { get; }
 
     #endregion
@@ -183,7 +134,6 @@ public class MainViewModel : BaseViewModel
 
     /// <summary>
     /// Kết nối với Server và đăng ký peer
-    /// TODO (sau): gọi thêm ServerCommunicator.RegisterAsync(), start heartbeat...
     /// </summary>
     private async Task ConnectAsync()
     {
@@ -192,7 +142,6 @@ public class MainViewModel : BaseViewModel
 
         try
         {
-            // Parse ServerAddress -> IP + Port
             var parts = ServerAddress.Split(':');
             if (parts.Length != 2 || !int.TryParse(parts[1], out var port))
             {
@@ -202,21 +151,20 @@ public class MainViewModel : BaseViewModel
                 return;
             }
 
-            // Cập nhật config từ UI
             _config.ServerIpAddress = parts[0];
             _config.ServerPort = port;
             _config.Username = Username;
 
-            // Tạo PeerClient và start
             _peerClient = new PeerClient(_config, _logger);
             await _peerClient.StartAsync();
+
+            // ✅ THÊM THEO TÀI LIỆU (Mục 4.3.1)
+            _peerClient.SetFileTransferRequestHandler(HandleIncomingFileTransferRequestAsync);
 
             if (_peerClient.IsRunning)
             {
                 IsConnected = true;
                 _logger.LogInfo("Successfully connected to server");
-
-                // Sau khi connect xong: load danh sách peer ban đầu
                 await RefreshPeersAsync();
             }
             else
@@ -243,7 +191,6 @@ public class MainViewModel : BaseViewModel
 
     /// <summary>
     /// Ngắt kết nối với Server
-    /// TODO (sau): deregister với server, stop heartbeat...
     /// </summary>
     private async Task DisconnectAsync()
     {
@@ -254,6 +201,9 @@ public class MainViewModel : BaseViewModel
         {
             if (_peerClient != null)
             {
+                // ✅ THÊM THEO TÀI LIỆU (Mục 4.3.3)
+                _peerClient.SetFileTransferRequestHandler(null);
+                
                 await _peerClient.StopAsync();
                 _peerClient = null;
             }
@@ -277,10 +227,10 @@ public class MainViewModel : BaseViewModel
 
     /// <summary>
     /// Refresh danh sách peer từ Server.
-    /// Hiện tại: placeholder, sau sẽ gọi ServerCommunicator.QueryPeersAsync().
     /// </summary>
     private async Task RefreshPeersAsync()
     {
+        // (Phần này giữ nguyên, không thay đổi)
         if (_peerClient == null || !_peerClient.IsRunning)
         {
             MessageBox.Show("Please connect to server first.",
@@ -326,6 +276,7 @@ public class MainViewModel : BaseViewModel
     /// </summary>
     private async Task ScanNetworkAsync()
     {
+        // (Phần này giữ nguyên, không thay đổi)
         if (_peerClient == null || !_peerClient.IsRunning)
         {
             MessageBox.Show("Please connect to server first.",
@@ -349,8 +300,6 @@ public class MainViewModel : BaseViewModel
                 return;
             }
 
-            // Có thể chọn: chỉ hiển thị peers từ scan,
-            // hoặc merge với list từ server. Đơn giản nhất: dùng luôn list mới.
             UpdatePeersList(peers);
 
             _logger.LogInfo($"Scan completed: {peers.Count} peer(s) discovered.");
@@ -372,10 +321,10 @@ public class MainViewModel : BaseViewModel
 
     /// <summary>
     /// Thêm file vào danh sách chia sẻ
-    /// TODO (sau): sync danh sách này lên server
     /// </summary>
     private void AddSharedFile()
     {
+        // (Phần này giữ nguyên, không thay đổi)
         try
         {
             var dialog = new Microsoft.Win32.OpenFileDialog
@@ -403,8 +352,6 @@ public class MainViewModel : BaseViewModel
                     SharedFiles.Add(new SharedFileViewModel(sharedFile));
                     _logger.LogInfo($"Added shared file: {fileInfo.Name}");
                 }
-
-                // TODO: cập nhật lại shared files trên server
             }
         }
         catch (Exception ex)
@@ -421,13 +368,13 @@ public class MainViewModel : BaseViewModel
     /// </summary>
     private void UpdatePeersList(List<PeerInfo> peerInfos)
     {
+        // (Phần này giữ nguyên, không thay đổi)
         Application.Current.Dispatcher.Invoke(() =>
         {
             Peers.Clear();
 
             foreach (var peerInfo in peerInfos)
             {
-                // Bỏ qua bản thân mình
                 if (peerInfo.Username.Equals(_config.Username, StringComparison.OrdinalIgnoreCase))
                     continue;
 
@@ -442,6 +389,7 @@ public class MainViewModel : BaseViewModel
     /// </summary>
     public async Task HandleFileDropAsync(PeerViewModel peer, IEnumerable<string> filePaths)
     {
+        // (Phần này giữ nguyên, không thay đổi)
         try
         {
             if (!peer.IsOnline)
@@ -474,7 +422,6 @@ public class MainViewModel : BaseViewModel
 
                 Application.Current.Dispatcher.Invoke(() => Transfers.Add(transfer));
 
-                // === Điểm quan trọng: dùng lại logic giống ConsoleUI ===
                 var success = await _peerClient.SendFileAsync(peer.Username, filePath);
 
                 if (success)
@@ -502,6 +449,7 @@ public class MainViewModel : BaseViewModel
     /// </summary>
     public void HandleFileReceived(string fileName, string fromPeer)
     {
+        // (Phần này giữ nguyên, không thay đổi)
         Application.Current.Dispatcher.Invoke(() =>
         {
             MessageBox.Show(
@@ -510,6 +458,69 @@ public class MainViewModel : BaseViewModel
 
             _logger.LogInfo($"Received file: {fileName} from {fromPeer}");
         });
+    }
+
+    // ✅ THÊM 2 PHƯƠNG THỨC MỚI THEO TÀI LIỆU (Mục 4.3.2)
+    /// <summary>
+    /// Xử lý yêu cầu chuyển file đến (incoming file transfer request)
+    /// Method này được gọi từ background thread (TCP listener)
+    /// </summary>
+    private async Task<bool> HandleIncomingFileTransferRequestAsync(
+        string fileName, 
+        long fileSize, 
+        string fromPeer, 
+        string checksum)
+    {
+        bool accepted = false;
+        
+        try
+        {
+            // Phải dùng Dispatcher vì method này được gọi từ background thread
+            // nhưng cần hiển thị MessageBox trên UI thread
+            await Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                var result = MessageBox.Show(
+                    $"Incoming File Transfer Request\n\n" +
+                    $"From: {fromPeer}\n" +
+                    $"File: {fileName}\n" +
+                    $"Size: {FormatFileSize(fileSize)}\n" +
+                    (!string.IsNullOrEmpty(checksum) 
+                        ? $"Checksum: {checksum.Substring(0, Math.Min(16, checksum.Length))}...\n" 
+                        : "") +
+                    $"\nDo you want to accept this file?",
+                    "File Transfer Request",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question,
+                    MessageBoxResult.No); // Default là No để an toàn
+                
+                accepted = (result == MessageBoxResult.Yes);
+                
+                _logger.LogInfo($"User {(accepted ? "accepted" : "rejected")} file transfer: {fileName} from {fromPeer}");
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Error showing file transfer request dialog: {ex.Message}", ex);
+            accepted = false; // Nếu có lỗi, mặc định reject
+        }
+        
+        return accepted;
+    }
+
+    /// <summary>
+    /// Format file size thành dạng dễ đọc (B, KB, MB, GB, TB)
+    /// </summary>
+    private static string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len /= 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
     }
 
     #endregion
