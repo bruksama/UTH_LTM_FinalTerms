@@ -282,24 +282,37 @@ public class MainViewModel : BaseViewModel
     private async Task RefreshPeersAsync()
     {
         if (_peerClient == null || !_peerClient.IsRunning)
+        {
+            MessageBox.Show("Please connect to server first.",
+                "Not Connected", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
+        }
 
         IsLoading = true;
+        ConnectionStatus = "Refreshing peers...";
 
         try
         {
-            _logger.LogInfo("Refreshing peer list from server (placeholder)...");
+            _logger.LogInfo("Refreshing peer list from registry server...");
+            var peers = await _peerClient.QueryPeersAsync();
 
-            // TODO: implement thật bằng ServerCommunicator.QueryPeersAsync()
-            await Task.Delay(500);
+            if (peers == null || peers.Count == 0)
+            {
+                Application.Current.Dispatcher.Invoke(() => Peers.Clear());
+                ConnectionStatus = "No peers found";
+                _logger.LogInfo("No peers found on registry server.");
+                return;
+            }
 
-            _logger.LogInfo("Peer list refresh completed (placeholder)");
+            UpdatePeersList(peers);
+            ConnectionStatus = $"Connected ({peers.Count} peers)";
+            _logger.LogInfo($"Peer list refresh completed: {peers.Count} peer(s).");
         }
         catch (Exception ex)
         {
             _logger.LogError("Error refreshing peers", ex);
-            MessageBox.Show(
-                $"Error refreshing peers: {ex.Message}",
+            ConnectionStatus = "Error refreshing peers";
+            MessageBox.Show($"Error refreshing peers: {ex.Message}",
                 "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
@@ -313,48 +326,46 @@ public class MainViewModel : BaseViewModel
     /// </summary>
     private async Task ScanNetworkAsync()
     {
+        if (_peerClient == null || !_peerClient.IsRunning)
+        {
+            MessageBox.Show("Please connect to server first.",
+                "Not Connected", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
         IsLoading = true;
+        ConnectionStatus = "Scanning LAN...";
 
         try
         {
-            _logger.LogInfo("Scanning LAN for peers...");
+            _logger.LogInfo("Scanning LAN for peers (UDP discovery)...");
+            var peers = await _peerClient.ScanLanAsync();
 
-            if (_peerClient != null)
+            if (peers == null || peers.Count == 0)
             {
-                var discoveredPeers = await _peerClient.ScanLanAsync();
+                _logger.LogInfo("Scan completed. No peers found.");
+                MessageBox.Show("No peers found on LAN.",
+                    "Scan Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
 
-                if (discoveredPeers != null && discoveredPeers.Count > 0)
-                {
-                    UpdatePeersList(discoveredPeers);
-                    _logger.LogInfo($"Scan completed. Found {discoveredPeers.Count} peer(s)");
-                    MessageBox.Show(
-                        $"Found {discoveredPeers.Count} peer(s) on the network",
-                        "Scan Complete", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-                else
-                {
-                    _logger.LogInfo("Scan completed. No peers found");
-                    MessageBox.Show(
-                        "No peers found on the network",
-                        "Scan Complete", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-            }
-            else
-            {
-                MessageBox.Show(
-                    "Please connect to server first",
-                    "Not Connected", MessageBoxButton.OK, MessageBoxImage.Warning);
-            }
+            // Có thể chọn: chỉ hiển thị peers từ scan,
+            // hoặc merge với list từ server. Đơn giản nhất: dùng luôn list mới.
+            UpdatePeersList(peers);
+
+            _logger.LogInfo($"Scan completed: {peers.Count} peer(s) discovered.");
+            MessageBox.Show($"Found {peers.Count} peer(s) on LAN.",
+                "Scan Complete", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
             _logger.LogError("Error scanning network", ex);
-            MessageBox.Show(
-                $"Error scanning network: {ex.Message}",
+            MessageBox.Show($"Error scanning network: {ex.Message}",
                 "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
         {
+            ConnectionStatus = IsConnected ? "Connected" : "Disconnected";
             IsLoading = false;
         }
     }
@@ -435,9 +446,14 @@ public class MainViewModel : BaseViewModel
         {
             if (!peer.IsOnline)
             {
-                MessageBox.Show(
-                    "Peer is offline",
-                    "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Peer is offline", "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (_peerClient == null || !_peerClient.IsRunning)
+            {
+                MessageBox.Show("Client is not connected.", "Error",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -450,27 +466,25 @@ public class MainViewModel : BaseViewModel
 
                 var transfer = new TransferViewModel
                 {
-                    FileName = fileInfo.Name,
-                    PeerName = peer.Username,
+                    FileName   = fileInfo.Name,
+                    PeerName   = peer.Username,
                     TotalBytes = fileInfo.Length,
-                    Status = "Preparing..."
+                    Status     = "Sending..."
                 };
 
                 Application.Current.Dispatcher.Invoke(() => Transfers.Add(transfer));
 
-                bool success = await peer.SendFileAsync(filePath);
+                // === Điểm quan trọng: dùng lại logic giống ConsoleUI ===
+                var success = await _peerClient.SendFileAsync(peer.Username, filePath);
 
                 if (success)
                 {
-                    transfer.Status = "Completed";
-                    transfer.IsCompleted = true;
-                    transfer.Progress = 100;
+                    transfer.MarkCompleted();
                     _logger.LogInfo($"File transfer completed: {fileInfo.Name} to {peer.Username}");
                 }
                 else
                 {
-                    transfer.Status = "Failed";
-                    transfer.IsFailed = true;
+                    transfer.MarkFailed();
                     _logger.LogError($"File transfer failed: {fileInfo.Name} to {peer.Username}");
                 }
             }
@@ -478,8 +492,7 @@ public class MainViewModel : BaseViewModel
         catch (Exception ex)
         {
             _logger.LogError("Error handling file drop", ex);
-            MessageBox.Show(
-                $"Error sending file: {ex.Message}",
+            MessageBox.Show($"Error sending file: {ex.Message}",
                 "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }

@@ -2,7 +2,7 @@ namespace P2PFileSharing.Client.GUI.ViewModels;
 
 /// <summary>
 /// ViewModel cho một file transfer đang diễn ra
-/// TODO: Implement transfer progress tracking and display
+/// Theo dõi tiến độ, trạng thái và tốc độ để bind ra UI
 /// </summary>
 public class TransferViewModel : BaseViewModel
 {
@@ -18,7 +18,6 @@ public class TransferViewModel : BaseViewModel
 
     /// <summary>
     /// Tên file đang transfer
-    /// TODO: Bind to UI
     /// </summary>
     public string FileName
     {
@@ -27,8 +26,7 @@ public class TransferViewModel : BaseViewModel
     }
 
     /// <summary>
-    /// Tên peer đang transfer với
-    /// TODO: Bind to UI
+    /// Tên peer (người gửi/nhận)
     /// </summary>
     public string PeerName
     {
@@ -37,8 +35,7 @@ public class TransferViewModel : BaseViewModel
     }
 
     /// <summary>
-    /// Tiến độ transfer (0-100)
-    /// TODO: Bind to ProgressBar
+    /// Tiến độ transfer (0-100) — bind vào ProgressBar
     /// </summary>
     public double Progress
     {
@@ -47,8 +44,7 @@ public class TransferViewModel : BaseViewModel
     }
 
     /// <summary>
-    /// Trạng thái transfer
-    /// TODO: Update based on transfer state
+    /// Trạng thái transfer: Pending / In Progress / Completed / Failed ...
     /// </summary>
     public string Status
     {
@@ -57,8 +53,7 @@ public class TransferViewModel : BaseViewModel
     }
 
     /// <summary>
-    /// Tốc độ transfer hiện tại
-    /// TODO: Calculate from bytes transferred and time elapsed
+    /// Tốc độ transfer hiện tại (text đã format, ví dụ: "1.25 MB/s")
     /// </summary>
     public string Speed
     {
@@ -67,36 +62,38 @@ public class TransferViewModel : BaseViewModel
     }
 
     /// <summary>
-    /// Số bytes đã transfer
-    /// TODO: Update during transfer
+    /// Số bytes đã gửi/nhận
+    /// Mỗi lần set sẽ tự cập nhật Progress
     /// </summary>
     public long BytesTransferred
     {
         get => _bytesTransferred;
         set
         {
-            SetProperty(ref _bytesTransferred, value);
-            UpdateProgress();
+            if (SetProperty(ref _bytesTransferred, value))
+            {
+                UpdateProgress();
+            }
         }
     }
 
     /// <summary>
-    /// Tổng số bytes cần transfer
-    /// TODO: Set from file size
+    /// Tổng số bytes của file
     /// </summary>
     public long TotalBytes
     {
         get => _totalBytes;
         set
         {
-            SetProperty(ref _totalBytes, value);
-            UpdateProgress();
+            if (SetProperty(ref _totalBytes, value))
+            {
+                UpdateProgress();
+            }
         }
     }
 
     /// <summary>
-    /// Transfer đã hoàn thành
-    /// TODO: Set to true when transfer completes
+    /// Đã hoàn thành
     /// </summary>
     public bool IsCompleted
     {
@@ -105,8 +102,7 @@ public class TransferViewModel : BaseViewModel
     }
 
     /// <summary>
-    /// Transfer bị lỗi
-    /// TODO: Set to true when transfer fails
+    /// Bị lỗi
     /// </summary>
     public bool IsFailed
     {
@@ -115,25 +111,70 @@ public class TransferViewModel : BaseViewModel
     }
 
     /// <summary>
-    /// Cập nhật progress dựa trên bytes transferred và total bytes
-    /// TODO: Implement progress calculation
+    /// Cập nhật progress dựa trên BytesTransferred và TotalBytes
     /// </summary>
     private void UpdateProgress()
     {
         if (_totalBytes > 0)
         {
             Progress = (_bytesTransferred * 100.0) / _totalBytes;
+
+            // Nếu đã đủ bytes thì mark completed (nếu chưa failed)
+            if (_bytesTransferred >= _totalBytes && _totalBytes > 0 && !IsFailed)
+            {
+                IsCompleted = true;
+                Status = "Completed";
+                Speed = "Done";
+            }
+        }
+        else
+        {
+            Progress = 0;
         }
     }
 
     /// <summary>
-    /// Cập nhật tốc độ transfer
-    /// TODO: Calculate speed from bytes transferred and elapsed time
+    /// Cập nhật tốc độ truyền (input là bytes/second)
     /// </summary>
     public void UpdateSpeed(long bytesPerSecond)
     {
-        // TODO: Format bytesPerSecond to MB/s or KB/s
-        Speed = $"{bytesPerSecond / 1024.0 / 1024.0:F2} MB/s";
+        const double KB = 1024.0;
+        const double MB = KB * 1024.0;
+
+        if (bytesPerSecond <= 0)
+        {
+            Speed = "0 KB/s";
+            return;
+        }
+
+        if (bytesPerSecond < MB)
+        {
+            Speed = $"{bytesPerSecond / KB:0.##} KB/s";
+        }
+        else
+        {
+            Speed = $"{bytesPerSecond / MB:0.##} MB/s";
+        }
+    }
+
+    /// <summary>
+    /// Helper: gọi khi transfer thành công
+    /// </summary>
+    public void MarkCompleted()
+    {
+        IsCompleted = true;
+        IsFailed = false;
+        Status = "Completed";
+        Progress = 100;
+    }
+
+    /// <summary>
+    /// Helper: gọi khi transfer bị lỗi
+    /// </summary>
+    public void MarkFailed(string? errorMessage = null)
+    {
+        IsFailed = true;
+        IsCompleted = false;
+        Status = string.IsNullOrWhiteSpace(errorMessage) ? "Failed" : $"Failed: {errorMessage}";
     }
 }
-
