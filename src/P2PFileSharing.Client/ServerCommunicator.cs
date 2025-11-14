@@ -261,9 +261,54 @@ public class ServerCommunicator
     /// </summary>
     public async Task SendHeartbeatAsync(string peerId)
     {
-        // TODO: Implement heartbeat
-        _logger.LogDebug($"TODO: Send heartbeat for peer {peerId}");
-        await Task.CompletedTask;
+        if (string.IsNullOrWhiteSpace(peerId))
+        {
+            return;
+        }
+
+        try
+        {
+            using var client = new System.Net.Sockets.TcpClient();
+
+            var timeoutMs = (int)P2PFileSharing.Common.Protocol.ProtocolConstants.ConnectionTimeout.TotalMilliseconds;
+            var cts = new CancellationTokenSource(timeoutMs);
+
+            _logger.LogDebug($"Connecting to server {_config.ServerIpAddress}:{_config.ServerPort} to send heartbeat...");
+
+            var connectTask = client.ConnectAsync(_config.ServerIpAddress, _config.ServerPort);
+            var timeoutTask = Task.Delay(timeoutMs, cts.Token);
+            var completed = await Task.WhenAny(connectTask, timeoutTask);
+
+            if (completed == timeoutTask || !client.Connected)
+            {
+                var errorMsg = completed == timeoutTask
+                    ? $"Connection timeout after {timeoutMs}ms"
+                    : "Connection failed";
+                _logger.LogDebug($"Heartbeat: {errorMsg} - Cannot connect to server {_config.ServerIpAddress}:{_config.ServerPort}");
+                return;
+            }
+
+            using var stream = client.GetStream();
+
+            client.SendTimeout = (int)P2PFileSharing.Common.Protocol.ProtocolConstants.ReadWriteTimeout.TotalMilliseconds;
+            client.ReceiveTimeout = (int)P2PFileSharing.Common.Protocol.ProtocolConstants.ReadWriteTimeout.TotalMilliseconds;
+
+            var hb = new HeartbeatMessage
+            {
+                PeerId = peerId
+            };
+
+            await P2PFileSharing.Common.Protocol.MessageSerializer.SendMessageAsync(stream, hb, cts.Token);
+
+            _logger.LogDebug($"Heartbeat sent for PeerId={peerId}");
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogDebug("Heartbeat: connection timed out");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug($"Heartbeat failed: {ex.Message}");
+        }
     }
 }
-
