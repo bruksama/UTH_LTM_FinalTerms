@@ -2,11 +2,9 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
 using System.Windows.Input;
-using P2PFileSharing.Client;
 using P2PFileSharing.Common.Configuration;
 using P2PFileSharing.Common.Infrastructure;
 using P2PFileSharing.Common.Models;
-using P2PFileSharing.Common.Models.Messages;
 
 namespace P2PFileSharing.Client.GUI.ViewModels;
 
@@ -31,16 +29,14 @@ public class MainViewModel : BaseViewModel
     {
         _config = config;
         _logger = logger;
-
-        // Initialize từ config
+        
         Username = config.Username;
         ServerAddress = $"{config.ServerIpAddress}:{config.ServerPort}";
 
         Peers = new ObservableCollection<PeerViewModel>();
         Transfers = new ObservableCollection<TransferViewModel>();
         SharedFiles = new ObservableCollection<SharedFileViewModel>();
-
-        // Initialize commands (bám sát TODO gốc)
+        
         ConnectCommand = new RelayCommand(
             async () => await ConnectAsync(),
             () => !IsConnected && !IsLoading);
@@ -63,8 +59,6 @@ public class MainViewModel : BaseViewModel
     }
 
     #region Properties
-
-    // (Vùng này giữ nguyên)
     public string Username
     {
         get => _username;
@@ -121,8 +115,6 @@ public class MainViewModel : BaseViewModel
     #endregion
 
     #region Commands
-    
-    // (Vùng này giữ nguyên)
     public ICommand ConnectCommand { get; }
     public ICommand DisconnectCommand { get; }
     public ICommand RefreshPeersCommand { get; }
@@ -339,19 +331,17 @@ public class MainViewModel : BaseViewModel
                     var fileInfo = new System.IO.FileInfo(filePath);
                     if (!fileInfo.Exists)
                         continue;
-
-                    // ✅ SỬA KHỐI NÀY
+                    
                     var sharedFile = new SharedFile
                     {
                         FileName = fileInfo.Name,
-                        FilePath = filePath, // Đường dẫn đầy đủ
+                        FilePath = filePath, 
                         FileSize = fileInfo.Length
                     };
                     
-                    // Tạo ViewModel và set trạng thái
                     var vm = new SharedFileViewModel(sharedFile)
                     {
-                        Direction = FileDirection.Sharing // Trạng thái Đang chia sẻ
+                        Direction = FileDirection.Sharing 
                     };
 
                     SharedFiles.Add(vm);
@@ -415,17 +405,14 @@ public class MainViewModel : BaseViewModel
                     continue;
 
                 var fileInfo = new System.IO.FileInfo(filePath);
-
-                // KHỐI NÀY SẼ THÊM VÀO "FILE TRANSFERS" (BÊN DƯỚI)
+                
                 var transfer = new TransferViewModel
                 {
                     FileName   = fileInfo.Name,
                     PeerName   = peer.Username,
                     TotalBytes = fileInfo.Length,
                     Status     = "Sending..."
-                    // (Bạn có thể thêm Direction/FullFilePath ở đây nếu muốn
-                    // danh sách "File Transfers" cũng có thể mở file, nhưng
-                    // theo yêu cầu của bạn, chúng ta tập trung vào "Shared Files")
+
                 };
 
                 Application.Current.Dispatcher.Invoke(() => Transfers.Add(transfer));
@@ -457,7 +444,6 @@ public class MainViewModel : BaseViewModel
     /// </summary>
     public void HandleFileReceived(string fileName, string fullSavePath, string fromPeer)
     {
-        // Thêm file đã nhận vào danh sách "Shared Files" (bên phải)
         Application.Current.Dispatcher.Invoke(() =>
         {
             try
@@ -469,22 +455,20 @@ public class MainViewModel : BaseViewModel
                 {
                     fileSize = new FileInfo(fullSavePath).Length;
                 }
-
-                // Tạo SharedFile model
+                
                 var sharedFile = new SharedFile
                 {
                     FileName = fileName,
-                    FilePath = fullSavePath, // Đường dẫn đầy đủ để mở
+                    FilePath = fullSavePath,
                     FileSize = fileSize
                 };
-
-                // Tạo ViewModel và set trạng thái
+                
                 var vm = new SharedFileViewModel(sharedFile)
                 {
-                    Direction = FileDirection.Received // Trạng thái Đã nhận
+                    Direction = FileDirection.Received 
                 };
 
-                SharedFiles.Add(vm); // Thêm vào danh sách BÊN PHẢI
+                SharedFiles.Add(vm);
             }
             catch (Exception ex)
             {
@@ -503,7 +487,6 @@ public class MainViewModel : BaseViewModel
         string fromPeer, 
         string checksum)
     {
-        // (Không thay đổi)
         bool accepted = false;
         
         try

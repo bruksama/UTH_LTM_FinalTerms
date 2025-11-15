@@ -209,13 +209,11 @@
                                             Padding="6"
                                             Background="Transparent">
                                         
-                                        <!-- Thêm MouseBinding để xử lý Double-click -->
                                         <Border.InputBindings>
                                             <MouseBinding MouseAction="LeftDoubleClick"
                                                           Command="{Binding OpenFileCommand}" />
                                         </Border.InputBindings>
                                         
-                                        <!-- Thêm ToolTip và đổi Cursor khi hover -->
                                         <Border.Style>
                                             <Style TargetType="Border">
                                                 <Setter Property="Cursor" Value="Hand" />

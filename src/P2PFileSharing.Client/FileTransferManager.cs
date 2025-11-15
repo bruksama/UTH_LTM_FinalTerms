@@ -12,14 +12,12 @@ namespace P2PFileSharing.Client;
 /// </summary>
 public class FileTransferManager
 {
-    // --- Thay đổi 1: Event cho file đã nhận ---
     /// <summary>
     /// Bắn event khi một file đã được nhận và lưu thành công
     /// Params: (fileName, fullSavePath, fromPeer)
     /// </summary>
     public event Action<string, string, string>? OnFileReceived;
-
-    // --- Thay đổi 2: Delegate/Callback cho xác nhận ---
+    
     /// <summary>
     /// Delegate để xử lý file transfer request trong GUI mode
     /// </summary>
@@ -28,17 +26,14 @@ public class FileTransferManager
         long fileSize, 
         string fromPeer, 
         string checksum);
-
-    // Field để lưu callback (null = console mode, not null = GUI mode)
+    
     private FileTransferRequestHandler? _fileTransferRequestHandler;
-    // --- Kết thúc thay đổi ---
 
 
     private readonly ClientConfig _config;
     private readonly ILogger _logger;
     private ConsoleUI? _consoleUI;
-
-    // Fields để quản lý receiver
+    
     private TcpListener? _tcpListener;
     private CancellationTokenSource? _receiverCts;
     private Task? _receiverTask;
@@ -92,7 +87,6 @@ public class FileTransferManager
     /// </summary>
     public async Task<bool> SendFileAsync(string peerIpAddress, int peerPort, string filePath)
     {
-        // (Không thay đổi)
         if (string.IsNullOrEmpty(filePath))
         {
             _logger.LogError("File path is empty");
@@ -245,7 +239,6 @@ public class FileTransferManager
     /// </summary>
     public void StartReceiver()
     {
-        // (Không thay đổi)
         if (_tcpListener != null && _receiverTask != null && !_receiverTask.IsCompleted) {
             _logger.LogWarning("File receiver is already running");
             return;
@@ -331,7 +324,6 @@ public class FileTransferManager
     /// </summary>
     private async Task ListenForConnectionsAsync(CancellationToken cancellationToken) 
     {
-        // (Không thay đổi)
         if (_tcpListener == null) return;
 
         _logger.LogInfo("File receiver listener started, waiting for connections...");
@@ -408,8 +400,7 @@ public class FileTransferManager
             var fileName = requestMessage.FileName;
             var fileSize = requestMessage.FileSize;
             var checksum = requestMessage.Checksum;
-
-            // (Logic 'if/else' gọi callback/Console đã giữ nguyên từ lần trước)
+            
             bool accepted = false;
             string? userInput = null;
 
@@ -577,7 +568,6 @@ public class FileTransferManager
                         Console.WriteLine($"\n✓ File received successfully!");
                         Console.WriteLine($"✓ Checksum verification: PASSED");
 
-                        // --- Thay đổi 3: Bắn event OnFileReceived ---
                         OnFileReceived?.Invoke(fileName, savePath, remoteEndPoint);
                     }
                     else
@@ -585,14 +575,11 @@ public class FileTransferManager
                         Console.WriteLine($"\n✗ Checksum verification: FAILED");
                         Console.WriteLine($"  Expected: {checksum}");
                         Console.WriteLine($"  Received: {receivedChecksum}");
-                        // Không bắn event nếu checksum fail
                     }
                 }
                 else
                 {
-                    // Vẫn bắn event ngay cả khi không có checksum
                     Console.WriteLine($"\n✓ File received successfully! (No checksum provided)");
-                    // --- Thay đổi 3: Bắn event OnFileReceived ---
                     OnFileReceived?.Invoke(fileName, savePath, remoteEndPoint);
                 }
 
@@ -655,7 +642,6 @@ public class FileTransferManager
     /// </summary>
     public void StopReceiver()
     {
-        // (Không thay đổi)
         if (_tcpListener == null)
         {
             _logger.LogWarning("File receiver is not running");
@@ -698,7 +684,6 @@ public class FileTransferManager
 
     private static string FormatFileSize(long bytes)
     {
-        // (Không thay đổi)
         string[] sizes = { "B", "KB", "MB", "GB", "TB" };
         double len = bytes;
         int order = 0;

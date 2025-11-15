@@ -66,8 +66,7 @@ public class SharedFileViewModel : BaseViewModel
         {
             if (SetProperty(ref _direction, value))
             {
-                // Tự động cập nhật Icon
-                DirectionIcon = value == FileDirection.Sharing ? "⏫" : "⏬"; // Chia sẻ / Đã nhận
+                DirectionIcon = value == FileDirection.Sharing ? "⏫" : "⏬";
             }
         }
     }
@@ -94,7 +93,6 @@ public class SharedFileViewModel : BaseViewModel
             {
                 _sharedFile.FilePath = value;
                 OnPropertyChanged();
-                // Yêu cầu UI kiểm tra lại CanExecute của OpenFileCommand
                 CommandManager.InvalidateRequerySuggested();
             }
         }
@@ -117,12 +115,10 @@ public class SharedFileViewModel : BaseViewModel
 
         try
         {
-            // Mở thư mục và trỏ vào file
             Process.Start("explorer.exe", $"/select,\"{FullFilePath}\"");
         }
         catch (Exception)
         {
-            // Fallback: Mở file trực tiếp (nếu explorer fail)
             try
             {
                 Process.Start(new ProcessStartInfo(FullFilePath) { UseShellExecute = true });
