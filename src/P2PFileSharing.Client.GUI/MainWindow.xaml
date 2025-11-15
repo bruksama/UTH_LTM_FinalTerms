@@ -6,135 +6,359 @@
         xmlns:views="clr-namespace:P2PFileSharing.Client.GUI.Views"
         mc:Ignorable="d"
         Title="P2P File Sharing"
-        Height="700" Width="1000"
-        Background="#F0F2F5"
-        WindowStartupLocation="CenterScreen">
+        Height="700" Width="1100"
+        WindowStartupLocation="CenterScreen"
+        FontFamily="Segoe UI">
 
-    <!--========================= GLOBAL RESOURCES =========================-->
+    <!--========================= BACKGROUND (LIGHT) =========================-->
+    <Window.Background>
+        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#F5F9FF" Offset="0"/>
+            <GradientStop Color="#EBF3FF" Offset="0.5"/>
+            <GradientStop Color="#FDFEFF" Offset="1"/>
+        </LinearGradientBrush>
+    </Window.Background>
+
+    <!--========================= RESOURCES =========================-->
     <Window.Resources>
         <!-- Colors -->
-        <Color x:Key="PrimaryColor">#4a90e2</Color>
-        <Color x:Key="PrimaryDarkColor">#357ABD</Color>
+        <Color x:Key="PrimaryColor">#4A90E2</Color>
+        <Color x:Key="PrimaryDarkColor">#2B6CB0</Color>
         <Color x:Key="AccentColor">#7C4DFF</Color>
-        <Color x:Key="PanelColor">#FFFFFFFF</Color>
-        <Color x:Key="BorderColor">#DDDDDD</Color>
+        <Color x:Key="PanelBorderColor">#D7E0F0</Color>
+        <Color x:Key="HeaderTextColor">#1E293B</Color>
+        <Color x:Key="SubtleTextColor">#6B7280</Color>
 
         <!-- Brushes -->
         <SolidColorBrush x:Key="PrimaryBrush" Color="{StaticResource PrimaryColor}" />
         <SolidColorBrush x:Key="PrimaryDarkBrush" Color="{StaticResource PrimaryDarkColor}" />
         <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}" />
-        <SolidColorBrush x:Key="PanelBrush" Color="{StaticResource PanelColor}" />
-        <SolidColorBrush x:Key="BorderBrushColor" Color="{StaticResource BorderColor}" />
+        <SolidColorBrush x:Key="HeaderTextBrush" Color="{StaticResource HeaderTextColor}" />
+        <SolidColorBrush x:Key="SubtleTextBrush" Color="{StaticResource SubtleTextColor}" />
+        <SolidColorBrush x:Key="PanelBorderBrush" Color="{StaticResource PanelBorderColor}" />
 
-        <!-- Panel Style -->
+        <!-- Glass / card panel -->
         <Style x:Key="ModernPanel" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource PanelBrush}" />
-            <Setter Property="CornerRadius" Value="10" />
-            <Setter Property="BorderBrush" Value="{StaticResource BorderBrushColor}" />
+            <Setter Property="Background">
+                <Setter.Value>
+                    <SolidColorBrush Color="#FAFBFF"/>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="CornerRadius" Value="18" />
+            <Setter Property="BorderBrush" Value="{StaticResource PanelBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="12" />
-            <Setter Property="Margin" Value="0,0,0,12" />
+            <Setter Property="Padding" Value="16" />
+            <Setter Property="Margin" Value="0,0,0,14" />
             <Setter Property="SnapsToDevicePixels" Value="True"/>
             <Setter Property="Effect">
                 <Setter.Value>
                     <DropShadowEffect 
-                        Color="#000000" 
-                        Opacity="0.12"
-                        BlurRadius="8"
-                        ShadowDepth="1"/>
+                        Color="#90A4AE" 
+                        Opacity="0.25"
+                        BlurRadius="18"
+                        ShadowDepth="2"/>
                 </Setter.Value>
             </Setter>
         </Style>
 
-        <!-- Modern Button -->
-        <Style TargetType="Button" x:Key="ModernButton">
-            <Setter Property="Background" Value="{StaticResource PrimaryBrush}" />
-            <Setter Property="Foreground" Value="White" />
-            <Setter Property="Padding" Value="8,4" />
-            <Setter Property="Margin" Value="4,0" />
-            <Setter Property="MinWidth" Value="100" />
+        <!-- Section title -->
+        <Style x:Key="SectionTitleTextStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource HeaderTextBrush}"/>
+            <Setter Property="FontSize" Value="18"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <!-- <Setter Property="CornerRadius" Value="6"/> -->
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}"
-                                CornerRadius="6">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center" />
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-            <!-- Hover & Press Effects -->
-            <Setter Property="BorderBrush" Value="{StaticResource PrimaryDarkBrush}" />
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- Subtle text -->
+        <Style x:Key="SubtleLabelTextStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource SubtleTextBrush}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- Light TextBox style -->
+        <Style TargetType="TextBox">
+            <Setter Property="Padding" Value="8"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Margin" Value="0,0,0,0"/>
+            <Setter Property="Foreground" Value="#111827"/>
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="BorderBrush" Value="#D1D5DB"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="{StaticResource PrimaryDarkBrush}"/>
-                </Trigger>
-                <Trigger Property="IsPressed" Value="True">
-                    <Setter Property="Background" Value="#255A9A"/>
+                <Trigger Property="IsKeyboardFocused" Value="True">
+                    <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+                    <Setter Property="BorderThickness" Value="1.4"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
 
-        <!-- Connection status style -->
+        <!-- Light / bright button -->
+        <Style TargetType="Button" x:Key="ModernButton">
+            <!-- Default: nút sáng rõ -->
+            <Setter Property="Background">
+                <Setter.Value>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#4A90E2" Offset="0"/>
+                        <GradientStop Color="#5EB2FF" Offset="1"/>
+                    </LinearGradientBrush>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="Margin" Value="8,0"/>
+            <Setter Property="MinWidth" Value="110"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+            <Setter Property="RenderTransform">
+                <Setter.Value>
+                    <ScaleTransform ScaleX="1" ScaleY="1"/>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect BlurRadius="10"
+                                      Color="#4A90E2"
+                                      ShadowDepth="0"
+                                      Opacity="0.35"/>
+                </Setter.Value>
+            </Setter>
+
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border CornerRadius="8"
+                                Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+
+            <Style.Triggers>
+                <!-- Hover -->
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background">
+                        <Setter.Value>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                <GradientStop Color="#3682DB" Offset="0"/>
+                                <GradientStop Color="#6CC2FF" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Setter.Value>
+                    </Setter>
+                    <Setter Property="Effect">
+                        <Setter.Value>
+                            <DropShadowEffect Color="#5EB2FF"
+                                              BlurRadius="14"
+                                              ShadowDepth="0"
+                                              Opacity="0.6"/>
+                        </Setter.Value>
+                    </Setter>
+                    <Setter Property="RenderTransform">
+                        <Setter.Value>
+                            <ScaleTransform ScaleX="1.04" ScaleY="1.04" />
+                        </Setter.Value>
+                    </Setter>
+                </Trigger>
+
+                <!-- Pressed -->
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background">
+                        <Setter.Value>
+                            <SolidColorBrush Color="#2B6CB0"/>
+                        </Setter.Value>
+                    </Setter>
+                    <Setter Property="Effect">
+                        <Setter.Value>
+                            <DropShadowEffect Color="#2B6CB0"
+                                              BlurRadius="8"
+                                              ShadowDepth="0"
+                                              Opacity="0.5"/>
+                        </Setter.Value>
+                    </Setter>
+                    <Setter Property="RenderTransform">
+                        <Setter.Value>
+                            <ScaleTransform ScaleX="0.97" ScaleY="0.97" />
+                        </Setter.Value>
+                    </Setter>
+                </Trigger>
+
+                <!-- Disabled -->
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Background" Value="#C9D6E7"/>
+                    <Setter Property="Foreground" Value="#FFFFFF"/>
+                    <Setter Property="Effect">
+                        <Setter.Value>
+                            <DropShadowEffect BlurRadius="0" Opacity="0"/>
+                        </Setter.Value>
+                    </Setter>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Connection status text (dùng trong header pill) -->
         <Style x:Key="ConnectionStatusTextStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="Red"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Margin" Value="10,0,0,0"/>
+            <Setter Property="Foreground" Value="#DC2626"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Margin" Value="4,0,0,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsConnected}" Value="True">
-                    <Setter Property="Foreground" Value="LimeGreen"/>
+                    <Setter Property="Foreground" Value="#16A34A"/>
                 </DataTrigger>
             </Style.Triggers>
         </Style>
 
     </Window.Resources>
 
-    <!--========================= MAIN LAYOUT =========================-->
-
-    <Grid Margin="15">
-
+    <!--========================= LAYOUT =========================-->
+    <Grid Margin="20">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="220"/>
+            <RowDefinition Height="Auto"/>   <!-- Header + connect bar -->
+            <RowDefinition Height="*"/>      <!-- Main content -->
+            <RowDefinition Height="240"/>    <!-- Transfers -->
         </Grid.RowDefinitions>
 
-        <!--===================== CONNECTION PANEL =====================-->
-        <Border Grid.Row="0" Style="{StaticResource ModernPanel}">
+        <!--============= DECORATIVE BACKGROUND SHAPES =============-->
+        <Grid IsHitTestVisible="False">
+            <Ellipse Width="260" Height="260"
+                     Fill="#DCEBFF"
+                     HorizontalAlignment="Left"
+                     VerticalAlignment="Top"
+                     Margin="-80,-100,0,0"
+                     Opacity="0.8"/>
+            <Ellipse Width="220" Height="220"
+                     Fill="#E9D5FF"
+                     HorizontalAlignment="Right"
+                     VerticalAlignment="Bottom"
+                     Margin="0,0,-60,-120"
+                     Opacity="0.7"/>
+        </Grid>
+
+        <!--===================== HEADER =====================-->
+        <DockPanel Grid.Row="0" Margin="0,0,0,16">
+            <!-- Left: App title -->
+            <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                <!-- Logo circle -->
+                <Border Width="40" Height="40"
+                        CornerRadius="20"
+                        Margin="0,0,10,0">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                            <GradientStop Color="#4A90E2" Offset="0"/>
+                            <GradientStop Color="#7C4DFF" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Border.Background>
+                    <TextBlock Text="P2P"
+                               Foreground="White"
+                               FontWeight="Bold"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               FontSize="14"/>
+                </Border>
+
+                <StackPanel>
+                    <TextBlock Text="P2P File Sharing"
+                               FontSize="22"
+                               FontWeight="Bold"
+                               Foreground="{StaticResource HeaderTextBrush}"/>
+                    <TextBlock Text="Share files instantly across your LAN – fast and simple."
+                               FontSize="12"
+                               Foreground="{StaticResource SubtleTextBrush}"/>
+                </StackPanel>
+            </StackPanel>
+
+            <!-- Right: connection pill + username -->
+            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                <!-- Connection pill -->
+                <Border CornerRadius="999"
+                        Padding="10,4"
+                        Margin="0,0,10,0">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Background" Value="#FEE2E2"/>
+                            <Setter Property="BorderBrush" Value="#FCA5A5"/>
+                            <Setter Property="BorderThickness" Value="1"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsConnected}" Value="True">
+                                    <Setter Property="Background" Value="#DCFCE7"/>
+                                    <Setter Property="BorderBrush" Value="#86EFAC"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Ellipse Width="8" Height="8" Margin="0,0,6,0">
+                            <Ellipse.Style>
+                                <Style TargetType="Ellipse">
+                                    <Setter Property="Fill" Value="#DC2626"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsConnected}" Value="True">
+                                            <Setter Property="Fill" Value="#16A34A"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Ellipse.Style>
+                        </Ellipse>
+                        <TextBlock Text="{Binding ConnectionStatus}"
+                                   Style="{StaticResource ConnectionStatusTextStyle}"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Small info: username -->
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="User:"
+                               Foreground="{StaticResource SubtleTextBrush}"
+                               FontSize="12"
+                               Margin="0,0,4,0"/>
+                    <TextBlock Text="{Binding Username}"
+                               Foreground="{StaticResource HeaderTextBrush}"
+                               FontSize="12"
+                               FontWeight="SemiBold"/>
+                </StackPanel>
+            </StackPanel>
+        </DockPanel>
+
+        <!--===================== CONNECTION BAR =====================-->
+        <Border Grid.Row="0"
+                Margin="0,46,0,0"
+                Style="{StaticResource ModernPanel}">
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="2*"/>
+                    <ColumnDefinition Width="2*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
                 <!-- Username -->
-                <TextBlock Grid.Column="0" Text="Username:" 
-                           VerticalAlignment="Center"
-                           FontWeight="Bold" Margin="0,0,10,0"/>
-                <TextBox Grid.Column="1"
-                         Text="{Binding Username}"
-                         Padding="8"
-                         FontSize="14"/>
+                <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                    <TextBlock Text="Username"
+                               Foreground="{StaticResource SubtleTextBrush}"
+                               FontSize="11"
+                               Margin="0,0,0,2"/>
+                    <TextBox Text="{Binding Username}"/>
+                </StackPanel>
 
-                <!-- Server -->
-                <TextBlock Grid.Column="2" 
-                           Text="Server:" 
-                           VerticalAlignment="Center" 
-                           FontWeight="Bold" Margin="20,0,10,0"/>
-                <TextBox Grid.Column="3"
-                         Text="{Binding ServerAddress}"
-                         Padding="8"
-                         FontSize="14"/>
+                <!-- Server address -->
+                <StackPanel Grid.Column="1" Margin="0,0,16,0">
+                    <TextBlock Text="Server address"
+                               Foreground="{StaticResource SubtleTextBrush}"
+                               FontSize="11"
+                               Margin="0,0,0,2"/>
+                    <TextBox Text="{Binding ServerAddress}"/>
+                </StackPanel>
 
                 <!-- Connect Buttons -->
-                <StackPanel Grid.Column="4" Orientation="Horizontal">
+                <StackPanel Grid.Column="2"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center">
                     <Button Content="Connect" 
                             Command="{Binding ConnectCommand}"
                             Style="{StaticResource ModernButton}"/>
@@ -146,37 +370,48 @@
         </Border>
 
         <!--===================== MAIN CONTENT =====================-->
-        <Grid Grid.Row="1">
+        <Grid Grid.Row="1" Margin="0,16,0,0">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="2*"/>
+                <ColumnDefinition Width="2.2*"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <!-- PEER PANEL -->
-            <Border Grid.Column="0" Style="{StaticResource ModernPanel}">
+            <!-- PEERS PANEL -->
+            <Border Grid.Column="0"
+                    Style="{StaticResource ModernPanel}"
+                    Margin="0,0,10,0">
                 <DockPanel>
+                    <!-- Header -->
                     <StackPanel DockPanel.Dock="Top"
-                                Orientation="Horizontal" Margin="0,0,0,12">
-                        <TextBlock Text="Online Peers" 
-                                   FontSize="18"
-                                   FontWeight="Bold"/>
+                                Orientation="Horizontal"
+                                Margin="0,0,0,12"
+                                VerticalAlignment="Center">
+                        <StackPanel Orientation="Vertical">
+                            <TextBlock Text="Online Peers"
+                                       Style="{StaticResource SectionTitleTextStyle}" />
+                            <TextBlock Text="Devices detected in your LAN – click a peer to start sharing."
+                                       Style="{StaticResource SubtleLabelTextStyle}"/>
+                        </StackPanel>
 
-                        <TextBlock Text="{Binding ConnectionStatus}"
-                                   Style="{StaticResource ConnectionStatusTextStyle}"/>
-
-                        <Button Content="Refresh" 
-                                Command="{Binding RefreshPeersCommand}"
-                                Style="{StaticResource ModernButton}"
-                                Margin="20,0"/>
-                        <Button Content="Scan LAN" 
-                                Command="{Binding ScanNetworkCommand}"
-                                Style="{StaticResource ModernButton}"/>
+                        <StackPanel Orientation="Horizontal"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"
+                                    Margin="5,0,0,0">
+                            <Button Content="Refresh" 
+                                    Command="{Binding RefreshPeersCommand}"
+                                    Style="{StaticResource ModernButton}"/>
+                            <Button Content="Scan LAN" 
+                                    Command="{Binding ScanNetworkCommand}"
+                                    Style="{StaticResource ModernButton}"/>
+                        </StackPanel>
                     </StackPanel>
 
+                    <!-- Peers list -->
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <ItemsControl ItemsSource="{Binding Peers}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
+                                    <!-- Giữ PeerItemControl y nguyên logic -->
                                     <views:PeerItemControl/>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
@@ -186,27 +421,37 @@
             </Border>
 
             <!-- SHARED FILES PANEL -->
-            <Border Grid.Column="1" Style="{StaticResource ModernPanel}">
+            <Border Grid.Column="1"
+                    Style="{StaticResource ModernPanel}"
+                    Margin="10,0,0,0">
                 <DockPanel>
-
+                    <!-- Header -->
                     <StackPanel DockPanel.Dock="Top"
-                                Orientation="Horizontal" Margin="0,0,0,12">
-                        <TextBlock Text="Shared Files" 
-                                   FontSize="18"
-                                   FontWeight="Bold"/>
+                                Orientation="Horizontal"
+                                Margin="0,0,0,12"
+                                VerticalAlignment="Center">
+                        <StackPanel Orientation="Vertical">
+                            <TextBlock Text="Shared Files"
+                                       Style="{StaticResource SectionTitleTextStyle}" />
+                            <TextBlock Text="Double-click to open."
+                                       Style="{StaticResource SubtleLabelTextStyle}"/>
+                        </StackPanel>
+
                         <Button Content="Add"
                                 Command="{Binding AddSharedFileCommand}"
                                 Style="{StaticResource ModernButton}"
-                                Margin="12,0"/>
+                                HorizontalAlignment="Right"
+                                Margin="20,0,0,0"/>
                     </StackPanel>
 
-                    <ScrollViewer>
+                    <!-- Shared files list -->
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <ItemsControl ItemsSource="{Binding SharedFiles}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Border BorderBrush="#eeeeee"
+                                    <Border BorderBrush="#E5E7EB"
                                             BorderThickness="0,0,0,1"
-                                            Padding="6"
+                                            Padding="8"
                                             Background="Transparent">
                                         
                                         <Border.InputBindings>
@@ -218,21 +463,32 @@
                                             <Style TargetType="Border">
                                                 <Setter Property="Cursor" Value="Hand" />
                                                 <Setter Property="ToolTip" Value="{Binding FullFilePath}" />
+                                                <Setter Property="Background" Value="Transparent" />
+                                                <Style.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="Background" Value="#EEF2FF"/>
+                                                    </Trigger>
+                                                </Style.Triggers>
                                             </Style>
                                         </Border.Style>
 
-                                        <StackPanel Orientation="Horizontal">
-                                            <!-- Thêm Icon (⏫/⏬) -->
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <!-- Direction icon -->
                                             <TextBlock Text="{Binding DirectionIcon}" 
                                                        Margin="0,0,8,0"
                                                        FontSize="14"
+                                                       VerticalAlignment="Center"
+                                                       Foreground="{StaticResource PrimaryBrush}"
                                                        ToolTip="{Binding Direction}"/>
                                             
-                                            <TextBlock Text="{Binding FileName}" 
-                                                       FontWeight="SemiBold"/>
-                                            <TextBlock Text=" (" Margin="5,0,0,0"/>
-                                            <TextBlock Text="{Binding FileSize}"/>
-                                            <TextBlock Text=")"/>
+                                            <StackPanel Orientation="Vertical">
+                                                <TextBlock Text="{Binding FileName}" 
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{StaticResource HeaderTextBrush}"/>
+                                                <TextBlock Foreground="{StaticResource SubtleTextBrush}">
+                                                    <Run Text="{Binding FileSize}"/>
+                                                </TextBlock>
+                                            </StackPanel>
                                         </StackPanel>
                                     </Border>
                                 </DataTemplate>
@@ -244,18 +500,29 @@
         </Grid>
 
         <!--===================== TRANSFER PANEL =====================-->
-        <Border Grid.Row="2" Style="{StaticResource ModernPanel}">
+        <Border Grid.Row="2"
+                Style="{StaticResource ModernPanel}"
+                Margin="0,16,0,0">
             <DockPanel>
-                <TextBlock DockPanel.Dock="Top"
-                           Text="File Transfers"
-                           FontSize="18"
-                           FontWeight="Bold"
-                           Margin="0,0,0,12"/>
+                <!-- Header -->
+                <StackPanel DockPanel.Dock="Top"
+                            Orientation="Horizontal"
+                            Margin="0,0,0,12"
+                            VerticalAlignment="Center">
+                    <StackPanel Orientation="Vertical">
+                        <TextBlock Text="File Transfers"
+                                   Style="{StaticResource SectionTitleTextStyle}" />
+                        <TextBlock Text="Live progress of incoming and outgoing transfers."
+                                   Style="{StaticResource SubtleLabelTextStyle}"/>
+                    </StackPanel>
+                </StackPanel>
 
+                <!-- Transfers list -->
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <ItemsControl ItemsSource="{Binding Transfers}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
+                                <!-- Giữ TransferItemControl y nguyên -->
                                 <views:TransferItemControl/>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
