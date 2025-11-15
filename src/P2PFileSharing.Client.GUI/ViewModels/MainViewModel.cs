@@ -1,10 +1,13 @@
 using System.Collections.ObjectModel;
-using System.IO;
+using System.IO; 
 using System.Windows;
 using System.Windows.Input;
+using P2PFileSharing.Client;
 using P2PFileSharing.Common.Configuration;
 using P2PFileSharing.Common.Infrastructure;
 using P2PFileSharing.Common.Models;
+using P2PFileSharing.Common.Models.Messages;
+using System.Linq; // Thêm 'using' này
 
 namespace P2PFileSharing.Client.GUI.ViewModels;
 
@@ -29,14 +32,16 @@ public class MainViewModel : BaseViewModel
     {
         _config = config;
         _logger = logger;
-        
+
+        // Initialize từ config
         Username = config.Username;
         ServerAddress = $"{config.ServerIpAddress}:{config.ServerPort}";
 
         Peers = new ObservableCollection<PeerViewModel>();
         Transfers = new ObservableCollection<TransferViewModel>();
         SharedFiles = new ObservableCollection<SharedFileViewModel>();
-        
+
+        // Initialize commands
         ConnectCommand = new RelayCommand(
             async () => await ConnectAsync(),
             () => !IsConnected && !IsLoading);
@@ -59,6 +64,7 @@ public class MainViewModel : BaseViewModel
     }
 
     #region Properties
+
     public string Username
     {
         get => _username;
@@ -115,6 +121,7 @@ public class MainViewModel : BaseViewModel
     #endregion
 
     #region Commands
+    
     public ICommand ConnectCommand { get; }
     public ICommand DisconnectCommand { get; }
     public ICommand RefreshPeersCommand { get; }
@@ -151,8 +158,10 @@ public class MainViewModel : BaseViewModel
             _peerClient = new PeerClient(_config, _logger);
             await _peerClient.StartAsync();
             
+            // Đăng ký các handler
             _peerClient.SetFileTransferRequestHandler(HandleIncomingFileTransferRequestAsync);
             _peerClient.OnFileReceived += HandleFileReceived; 
+            _peerClient.OnTransferProgress += HandleTransferProgress; // Đăng ký event tiến độ
 
             if (_peerClient.IsRunning)
             {
@@ -195,7 +204,8 @@ public class MainViewModel : BaseViewModel
             if (_peerClient != null)
             {
                 _peerClient.SetFileTransferRequestHandler(null);
-                _peerClient.OnFileReceived -= HandleFileReceived;
+                _peerClient.OnFileReceived -= HandleFileReceived; 
+                _peerClient.OnTransferProgress -= HandleTransferProgress; // Hủy đăng ký event tiến độ
                 
                 await _peerClient.StopAsync();
                 _peerClient = null;
@@ -331,7 +341,7 @@ public class MainViewModel : BaseViewModel
                     var fileInfo = new System.IO.FileInfo(filePath);
                     if (!fileInfo.Exists)
                         continue;
-                    
+
                     var sharedFile = new SharedFile
                     {
                         FileName = fileInfo.Name,
@@ -405,14 +415,15 @@ public class MainViewModel : BaseViewModel
                     continue;
 
                 var fileInfo = new System.IO.FileInfo(filePath);
-                
+
                 var transfer = new TransferViewModel
                 {
                     FileName   = fileInfo.Name,
                     PeerName   = peer.Username,
                     TotalBytes = fileInfo.Length,
-                    Status     = "Sending..."
-
+                    Status     = "Sending...",
+                    Direction = TransferDirection.Send, 
+                    FullFilePath = filePath 
                 };
 
                 Application.Current.Dispatcher.Invoke(() => Transfers.Add(transfer));
@@ -444,6 +455,7 @@ public class MainViewModel : BaseViewModel
     /// </summary>
     public void HandleFileReceived(string fileName, string fullSavePath, string fromPeer)
     {
+        // Thêm file đã nhận vào danh sách "Shared Files" (bên phải)
         Application.Current.Dispatcher.Invoke(() =>
         {
             try
@@ -455,24 +467,45 @@ public class MainViewModel : BaseViewModel
                 {
                     fileSize = new FileInfo(fullSavePath).Length;
                 }
-                
+
                 var sharedFile = new SharedFile
                 {
                     FileName = fileName,
-                    FilePath = fullSavePath,
+                    FilePath = fullSavePath, 
                     FileSize = fileSize
                 };
-                
+
                 var vm = new SharedFileViewModel(sharedFile)
                 {
                     Direction = FileDirection.Received 
                 };
 
-                SharedFiles.Add(vm);
+                SharedFiles.Add(vm); 
             }
             catch (Exception ex)
             {
                 _logger.LogError($"Error adding received file to UI: {ex.Message}", ex);
+            }
+        });
+    }
+    
+    /// <summary>
+    /// Xử lý khi tiến độ transfer thay đổi
+    /// </summary>
+    private void HandleTransferProgress(string fileName, long bytesTransferred, long totalBytes, double speedMbPerSecond)
+    {
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            // Tìm TransferViewModel tương ứng trong danh sách "File Transfers" (bên dưới)
+            // (Giả sử fileName là duy nhất trong danh sách đang transfer)
+            var transferVm = Transfers.FirstOrDefault(t => t.FileName == fileName && !t.IsCompleted);
+
+            if (transferVm != null)
+            {
+                transferVm.BytesTransferred = bytesTransferred;
+                transferVm.TotalBytes = totalBytes;
+                transferVm.Speed = $"{speedMbPerSecond:F2} MB/s";
+                transferVm.Status = "In Progress";
             }
         });
     }
@@ -526,7 +559,6 @@ public class MainViewModel : BaseViewModel
     /// </summary>
     private static string FormatFileSize(long bytes)
     {
-        // (Không thay đổi)
         string[] sizes = { "B", "KB", "MB", "GB", "TB" };
         double len = bytes;
         int order = 0;
