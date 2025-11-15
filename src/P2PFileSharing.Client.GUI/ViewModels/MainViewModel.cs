@@ -1,249 +1,527 @@
 using System.Collections.ObjectModel;
+using System.Windows;
 using System.Windows.Input;
+using P2PFileSharing.Client;
 using P2PFileSharing.Common.Configuration;
 using P2PFileSharing.Common.Infrastructure;
 using P2PFileSharing.Common.Models;
+using P2PFileSharing.Common.Models.Messages; // ✅ THÊM THEO TÀI LIỆU
 
 namespace P2PFileSharing.Client.GUI.ViewModels;
 
 /// <summary>
 /// Main ViewModel cho MainWindow
-/// TODO: Implement main UI logic, peer list management, and file transfer coordination
+/// Quản lý kết nối, danh sách peers, shared files và chuyển file
 /// </summary>
 public class MainViewModel : BaseViewModel
 {
     private readonly ClientConfig _config;
     private readonly ILogger _logger;
+    private PeerClient? _peerClient;
+
     private string _username = string.Empty;
     private string _serverAddress = "127.0.0.1:5000";
     private bool _isConnected;
     private string _connectionStatus = "Disconnected";
     private PeerViewModel? _selectedPeer;
+    private bool _isLoading;
 
     public MainViewModel(ClientConfig config, ILogger logger)
     {
         _config = config;
         _logger = logger;
-        
-        // TODO: Initialize from config
+
+        // Initialize từ config
         Username = config.Username;
         ServerAddress = $"{config.ServerIpAddress}:{config.ServerPort}";
-        
+
         Peers = new ObservableCollection<PeerViewModel>();
         Transfers = new ObservableCollection<TransferViewModel>();
         SharedFiles = new ObservableCollection<SharedFileViewModel>();
 
-        // TODO: Initialize commands
-        ConnectCommand = new RelayCommand(async () => await ConnectAsync(), () => !IsConnected);
-        DisconnectCommand = new RelayCommand(async () => await DisconnectAsync(), () => IsConnected);
-        RefreshPeersCommand = new RelayCommand(async () => await RefreshPeersAsync());
-        ScanNetworkCommand = new RelayCommand(async () => await ScanNetworkAsync());
-        AddSharedFileCommand = new RelayCommand(() => AddSharedFile());
+        // Initialize commands (bám sát TODO gốc)
+        ConnectCommand = new RelayCommand(
+            async () => await ConnectAsync(),
+            () => !IsConnected && !IsLoading);
+
+        DisconnectCommand = new RelayCommand(
+            async () => await DisconnectAsync(),
+            () => IsConnected && !IsLoading);
+
+        RefreshPeersCommand = new RelayCommand(
+            async () => await RefreshPeersAsync(),
+            () => IsConnected && !IsLoading);
+
+        ScanNetworkCommand = new RelayCommand(
+            async () => await ScanNetworkAsync(),
+            () => !IsLoading);
+
+        AddSharedFileCommand = new RelayCommand(
+            () => AddSharedFile(),
+            () => !IsLoading);
     }
 
-    /// <summary>
-    /// Username của peer này
-    /// TODO: Bind to TextBox in UI
-    /// </summary>
+    #region Properties
+
+    // (Vùng này giữ nguyên, không thay đổi)
     public string Username
     {
         get => _username;
         set => SetProperty(ref _username, value);
     }
 
-    /// <summary>
-    /// Địa chỉ Server (IP:Port)
-    /// TODO: Bind to TextBox in UI
-    /// </summary>
     public string ServerAddress
     {
         get => _serverAddress;
         set => SetProperty(ref _serverAddress, value);
     }
 
-    /// <summary>
-    /// Trạng thái kết nối với Server
-    /// TODO: Update when connection state changes
-    /// </summary>
     public bool IsConnected
     {
         get => _isConnected;
         set
         {
-            SetProperty(ref _isConnected, value);
-            // TODO: Update command CanExecute states
-            ConnectionStatus = value ? "Connected" : "Disconnected";
+            if (SetProperty(ref _isConnected, value))
+            {
+                ConnectionStatus = value ? "Connected" : "Disconnected";
+                CommandManager.InvalidateRequerySuggested();
+            }
         }
     }
 
-    /// <summary>
-    /// Trạng thái kết nối (text)
-    /// TODO: Bind to StatusLabel in UI
-    /// </summary>
     public string ConnectionStatus
     {
         get => _connectionStatus;
         set => SetProperty(ref _connectionStatus, value);
     }
 
-    /// <summary>
-    /// Peer được chọn trong danh sách
-    /// TODO: Bind to SelectedItem of ListView/ItemsControl
-    /// </summary>
     public PeerViewModel? SelectedPeer
     {
         get => _selectedPeer;
         set => SetProperty(ref _selectedPeer, value);
     }
 
-    /// <summary>
-    /// Danh sách các peer đang online
-    /// TODO: Bind to ItemsControl/ListView in UI
-    /// </summary>
+    public bool IsLoading
+    {
+        get => _isLoading;
+        set
+        {
+            if (SetProperty(ref _isLoading, value))
+            {
+                CommandManager.InvalidateRequerySuggested();
+            }
+        }
+    }
+
     public ObservableCollection<PeerViewModel> Peers { get; }
-
-    /// <summary>
-    /// Danh sách các file transfer đang diễn ra
-    /// TODO: Bind to TransferList in UI
-    /// </summary>
     public ObservableCollection<TransferViewModel> Transfers { get; }
-
-    /// <summary>
-    /// Danh sách file đang chia sẻ
-    /// TODO: Bind to SharedFilesList in UI
-    /// </summary>
     public ObservableCollection<SharedFileViewModel> SharedFiles { get; }
 
-    /// <summary>
-    /// Command để kết nối với Server
-    /// TODO: Implement connection logic
-    /// </summary>
+    #endregion
+
+    #region Commands
+    
+    // (Vùng này giữ nguyên, không thay đổi)
     public ICommand ConnectCommand { get; }
-
-    /// <summary>
-    /// Command để ngắt kết nối với Server
-    /// TODO: Implement disconnection logic
-    /// </summary>
     public ICommand DisconnectCommand { get; }
-
-    /// <summary>
-    /// Command để refresh danh sách peer từ Server
-    /// TODO: Implement refresh logic
-    /// </summary>
     public ICommand RefreshPeersCommand { get; }
-
-    /// <summary>
-    /// Command để scan mạng LAN bằng UDP
-    /// TODO: Implement UDP scan logic
-    /// </summary>
     public ICommand ScanNetworkCommand { get; }
-
-    /// <summary>
-    /// Command để thêm file vào danh sách chia sẻ
-    /// TODO: Implement file selection dialog
-    /// </summary>
     public ICommand AddSharedFileCommand { get; }
+
+    #endregion
+
+    #region Methods
 
     /// <summary>
     /// Kết nối với Server và đăng ký peer
-    /// TODO: Call PeerClient.StartAsync()
-    /// TODO: Register with server using ServerCommunicator.RegisterAsync()
-    /// TODO: Start file receiver listener
-    /// TODO: Start UDP discovery listener
-    /// TODO: Start heartbeat task
     /// </summary>
     private async Task ConnectAsync()
     {
-        // TODO: Parse ServerAddress to get IP and Port
-        // TODO: Create/initialize PeerClient
-        // TODO: Call PeerClient.StartAsync()
-        // TODO: Update IsConnected
-        // TODO: Load initial peer list
-        await Task.CompletedTask;
+        IsLoading = true;
+        ConnectionStatus = "Connecting...";
+
+        try
+        {
+            var parts = ServerAddress.Split(':');
+            if (parts.Length != 2 || !int.TryParse(parts[1], out var port))
+            {
+                MessageBox.Show(
+                    "Invalid server address format. Use IP:Port (e.g., 192.168.1.100:5000)",
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            _config.ServerIpAddress = parts[0];
+            _config.ServerPort = port;
+            _config.Username = Username;
+
+            _peerClient = new PeerClient(_config, _logger);
+            await _peerClient.StartAsync();
+
+            // ✅ THÊM THEO TÀI LIỆU (Mục 4.3.1)
+            _peerClient.SetFileTransferRequestHandler(HandleIncomingFileTransferRequestAsync);
+
+            if (_peerClient.IsRunning)
+            {
+                IsConnected = true;
+                _logger.LogInfo("Successfully connected to server");
+                await RefreshPeersAsync();
+            }
+            else
+            {
+                ConnectionStatus = "Connection failed";
+                MessageBox.Show(
+                    "Failed to connect to server. Check server address and ensure server is running.",
+                    "Connection Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Error connecting to server", ex);
+            ConnectionStatus = "Connection failed";
+            MessageBox.Show(
+                $"Error connecting to server: {ex.Message}",
+                "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            IsLoading = false;
+        }
     }
 
     /// <summary>
     /// Ngắt kết nối với Server
-    /// TODO: Call PeerClient.StopAsync()
-    /// TODO: Deregister from server
-    /// TODO: Stop all listeners
-    /// TODO: Clear peer list
     /// </summary>
     private async Task DisconnectAsync()
     {
-        // TODO: Call PeerClient.StopAsync()
-        // TODO: Update IsConnected
-        // TODO: Clear Peers collection
-        await Task.CompletedTask;
+        IsLoading = true;
+        ConnectionStatus = "Disconnecting...";
+
+        try
+        {
+            if (_peerClient != null)
+            {
+                // ✅ THÊM THEO TÀI LIỆU (Mục 4.3.3)
+                _peerClient.SetFileTransferRequestHandler(null);
+                
+                await _peerClient.StopAsync();
+                _peerClient = null;
+            }
+
+            IsConnected = false;
+            Peers.Clear();
+            _logger.LogInfo("Disconnected from server");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Error disconnecting", ex);
+            MessageBox.Show(
+                $"Error disconnecting: {ex.Message}",
+                "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            IsLoading = false;
+        }
     }
 
     /// <summary>
-    /// Refresh danh sách peer từ Server
-    /// TODO: Call ServerCommunicator.QueryPeersAsync()
-    /// TODO: Update Peers collection
+    /// Refresh danh sách peer từ Server.
     /// </summary>
     private async Task RefreshPeersAsync()
     {
-        // TODO: Query peers from server
-        // TODO: Update Peers collection
-        // TODO: Show loading indicator
-        await Task.CompletedTask;
+        // (Phần này giữ nguyên, không thay đổi)
+        if (_peerClient == null || !_peerClient.IsRunning)
+        {
+            MessageBox.Show("Please connect to server first.",
+                "Not Connected", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        IsLoading = true;
+        ConnectionStatus = "Refreshing peers...";
+
+        try
+        {
+            _logger.LogInfo("Refreshing peer list from registry server...");
+            var peers = await _peerClient.QueryPeersAsync();
+
+            if (peers == null || peers.Count == 0)
+            {
+                Application.Current.Dispatcher.Invoke(() => Peers.Clear());
+                ConnectionStatus = "No peers found";
+                _logger.LogInfo("No peers found on registry server.");
+                return;
+            }
+
+            UpdatePeersList(peers);
+            ConnectionStatus = $"Connected ({peers.Count} peers)";
+            _logger.LogInfo($"Peer list refresh completed: {peers.Count} peer(s).");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Error refreshing peers", ex);
+            ConnectionStatus = "Error refreshing peers";
+            MessageBox.Show($"Error refreshing peers: {ex.Message}",
+                "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            IsLoading = false;
+        }
     }
 
     /// <summary>
-    /// Scan mạng LAN bằng UDP broadcast
-    /// TODO: Call UdpDiscovery.ScanNetworkAsync()
-    /// TODO: Merge results with existing peer list
+    /// Scan mạng LAN bằng UDP broadcast qua PeerClient.ScanLanAsync()
     /// </summary>
     private async Task ScanNetworkAsync()
     {
-        // TODO: Call UdpDiscovery.ScanNetworkAsync()
-        // TODO: Add discovered peers to Peers collection
-        // TODO: Show scan progress
-        await Task.CompletedTask;
+        // (Phần này giữ nguyên, không thay đổi)
+        if (_peerClient == null || !_peerClient.IsRunning)
+        {
+            MessageBox.Show("Please connect to server first.",
+                "Not Connected", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        IsLoading = true;
+        ConnectionStatus = "Scanning LAN...";
+
+        try
+        {
+            _logger.LogInfo("Scanning LAN for peers (UDP discovery)...");
+            var peers = await _peerClient.ScanLanAsync();
+
+            if (peers == null || peers.Count == 0)
+            {
+                _logger.LogInfo("Scan completed. No peers found.");
+                MessageBox.Show("No peers found on LAN.",
+                    "Scan Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            UpdatePeersList(peers);
+
+            _logger.LogInfo($"Scan completed: {peers.Count} peer(s) discovered.");
+            MessageBox.Show($"Found {peers.Count} peer(s) on LAN.",
+                "Scan Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Error scanning network", ex);
+            MessageBox.Show($"Error scanning network: {ex.Message}",
+                "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            ConnectionStatus = IsConnected ? "Connected" : "Disconnected";
+            IsLoading = false;
+        }
     }
 
     /// <summary>
     /// Thêm file vào danh sách chia sẻ
-    /// TODO: Show file selection dialog
-    /// TODO: Add file to SharedFiles collection
-    /// TODO: Update shared files list on server
     /// </summary>
     private void AddSharedFile()
     {
-        // TODO: Show OpenFileDialog
-        // TODO: Add selected file to SharedFiles
-        // TODO: Update server registration with new shared files
+        // (Phần này giữ nguyên, không thay đổi)
+        try
+        {
+            var dialog = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = "Select Files to Share",
+                Multiselect = true,
+                Filter = "All Files|*.*"
+            };
+
+            if (dialog.ShowDialog() == true)
+            {
+                foreach (var filePath in dialog.FileNames)
+                {
+                    var fileInfo = new System.IO.FileInfo(filePath);
+                    if (!fileInfo.Exists)
+                        continue;
+
+                    var sharedFile = new SharedFile
+                    {
+                        FileName = fileInfo.Name,
+                        FilePath = filePath,
+                        FileSize = fileInfo.Length
+                    };
+
+                    SharedFiles.Add(new SharedFileViewModel(sharedFile));
+                    _logger.LogInfo($"Added shared file: {fileInfo.Name}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Error adding shared file", ex);
+            MessageBox.Show(
+                $"Error adding file: {ex.Message}",
+                "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     /// <summary>
-    /// Xử lý khi file được drop vào một peer
-    /// TODO: Called from PeerItemControl drag & drop handler
-    /// TODO: Create TransferViewModel
-    /// TODO: Start file transfer
+    /// Cập nhật danh sách Peers từ list PeerInfo
+    /// </summary>
+    private void UpdatePeersList(List<PeerInfo> peerInfos)
+    {
+        // (Phần này giữ nguyên, không thay đổi)
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            Peers.Clear();
+
+            foreach (var peerInfo in peerInfos)
+            {
+                if (peerInfo.Username.Equals(_config.Username, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var peerViewModel = new PeerViewModel(peerInfo);
+                Peers.Add(peerViewModel);
+            }
+        });
+    }
+
+    /// <summary>
+    /// Xử lý khi file được drop vào một peer (drag & drop từ PeerItemControl)
     /// </summary>
     public async Task HandleFileDropAsync(PeerViewModel peer, IEnumerable<string> filePaths)
     {
-        // TODO: Validate peer is online
-        // TODO: For each file:
-        //   - Create TransferViewModel
-        //   - Add to Transfers collection
-        //   - Call peer.SendFileAsync()
-        //   - Update transfer progress
-        await Task.CompletedTask;
+        // (Phần này giữ nguyên, không thay đổi)
+        try
+        {
+            if (!peer.IsOnline)
+            {
+                MessageBox.Show("Peer is offline", "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (_peerClient == null || !_peerClient.IsRunning)
+            {
+                MessageBox.Show("Client is not connected.", "Error",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            foreach (var filePath in filePaths)
+            {
+                if (!System.IO.File.Exists(filePath))
+                    continue;
+
+                var fileInfo = new System.IO.FileInfo(filePath);
+
+                var transfer = new TransferViewModel
+                {
+                    FileName   = fileInfo.Name,
+                    PeerName   = peer.Username,
+                    TotalBytes = fileInfo.Length,
+                    Status     = "Sending..."
+                };
+
+                Application.Current.Dispatcher.Invoke(() => Transfers.Add(transfer));
+
+                var success = await _peerClient.SendFileAsync(peer.Username, filePath);
+
+                if (success)
+                {
+                    transfer.MarkCompleted();
+                    _logger.LogInfo($"File transfer completed: {fileInfo.Name} to {peer.Username}");
+                }
+                else
+                {
+                    transfer.MarkFailed();
+                    _logger.LogError($"File transfer failed: {fileInfo.Name} to {peer.Username}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Error handling file drop", ex);
+            MessageBox.Show($"Error sending file: {ex.Message}",
+                "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     /// <summary>
     /// Xử lý khi nhận được file từ peer khác
-    /// TODO: Called from FileTransferManager when file is received
-    /// TODO: Show notification
-    /// TODO: Update UI
     /// </summary>
     public void HandleFileReceived(string fileName, string fromPeer)
     {
-        // TODO: Show notification/toast
-        // TODO: Update received files list
-        // TODO: Log event
-    }
-}
+        // (Phần này giữ nguyên, không thay đổi)
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            MessageBox.Show(
+                $"Received file: {fileName} from {fromPeer}",
+                "File Received", MessageBoxButton.OK, MessageBoxImage.Information);
 
+            _logger.LogInfo($"Received file: {fileName} from {fromPeer}");
+        });
+    }
+
+    // ✅ THÊM 2 PHƯƠNG THỨC MỚI THEO TÀI LIỆU (Mục 4.3.2)
+    /// <summary>
+    /// Xử lý yêu cầu chuyển file đến (incoming file transfer request)
+    /// Method này được gọi từ background thread (TCP listener)
+    /// </summary>
+    private async Task<bool> HandleIncomingFileTransferRequestAsync(
+        string fileName, 
+        long fileSize, 
+        string fromPeer, 
+        string checksum)
+    {
+        bool accepted = false;
+        
+        try
+        {
+            // Phải dùng Dispatcher vì method này được gọi từ background thread
+            // nhưng cần hiển thị MessageBox trên UI thread
+            await Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                var result = MessageBox.Show(
+                    $"Incoming File Transfer Request\n\n" +
+                    $"From: {fromPeer}\n" +
+                    $"File: {fileName}\n" +
+                    $"Size: {FormatFileSize(fileSize)}\n" +
+                    (!string.IsNullOrEmpty(checksum) 
+                        ? $"Checksum: {checksum.Substring(0, Math.Min(16, checksum.Length))}...\n" 
+                        : "") +
+                    $"\nDo you want to accept this file?",
+                    "File Transfer Request",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question,
+                    MessageBoxResult.No); // Default là No để an toàn
+                
+                accepted = (result == MessageBoxResult.Yes);
+                
+                _logger.LogInfo($"User {(accepted ? "accepted" : "rejected")} file transfer: {fileName} from {fromPeer}");
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Error showing file transfer request dialog: {ex.Message}", ex);
+            accepted = false; // Nếu có lỗi, mặc định reject
+        }
+        
+        return accepted;
+    }
+
+    /// <summary>
+    /// Format file size thành dạng dễ đọc (B, KB, MB, GB, TB)
+    /// </summary>
+    private static string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len /= 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+
+    #endregion
+}

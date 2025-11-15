@@ -3,21 +3,247 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:P2PFileSharing.Client.GUI"
         xmlns:views="clr-namespace:P2PFileSharing.Client.GUI.Views"
         mc:Ignorable="d"
-        Title="P2P File Sharing" Height="700" Width="1000">
-    <Grid>
-        <!-- TODO: Implement main layout with MVVM binding -->
-        <!-- TODO: Add connection panel at top -->
-        <!-- TODO: Add peer list in main area -->
-        <!-- TODO: Add transfer queue panel -->
-        <!-- TODO: Add shared files panel -->
-        
-        <TextBlock Text="TODO: Implement MainWindow layout" 
-                   HorizontalAlignment="Center" 
-                   VerticalAlignment="Center"
-                   FontSize="16"
-                   Foreground="Gray"/>
+        Title="P2P File Sharing"
+        Height="700" Width="1000"
+        Background="#F0F2F5"
+        WindowStartupLocation="CenterScreen">
+
+    <!--========================= GLOBAL RESOURCES =========================-->
+    <Window.Resources>
+        <!-- Colors -->
+        <Color x:Key="PrimaryColor">#4a90e2</Color>
+        <Color x:Key="PrimaryDarkColor">#357ABD</Color>
+        <Color x:Key="AccentColor">#7C4DFF</Color>
+        <Color x:Key="PanelColor">#FFFFFFFF</Color>
+        <Color x:Key="BorderColor">#DDDDDD</Color>
+
+        <!-- Brushes -->
+        <SolidColorBrush x:Key="PrimaryBrush" Color="{StaticResource PrimaryColor}" />
+        <SolidColorBrush x:Key="PrimaryDarkBrush" Color="{StaticResource PrimaryDarkColor}" />
+        <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}" />
+        <SolidColorBrush x:Key="PanelBrush" Color="{StaticResource PanelColor}" />
+        <SolidColorBrush x:Key="BorderBrushColor" Color="{StaticResource BorderColor}" />
+
+        <!-- Panel Style -->
+        <Style x:Key="ModernPanel" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource PanelBrush}" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrushColor}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="12" />
+            <Setter Property="Margin" Value="0,0,0,12" />
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect 
+                        Color="#000000" 
+                        Opacity="0.12"
+                        BlurRadius="8"
+                        ShadowDepth="1"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Modern Button -->
+        <Style TargetType="Button" x:Key="ModernButton">
+            <Setter Property="Background" Value="{StaticResource PrimaryBrush}" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="Margin" Value="4,0" />
+            <Setter Property="MinWidth" Value="100" />
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <!-- <Setter Property="CornerRadius" Value="6"/> -->
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <!-- Hover & Press Effects -->
+            <Setter Property="BorderBrush" Value="{StaticResource PrimaryDarkBrush}" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{StaticResource PrimaryDarkBrush}"/>
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="#255A9A"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Connection status style -->
+        <Style x:Key="ConnectionStatusTextStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="Red"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Margin" Value="10,0,0,0"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsConnected}" Value="True">
+                    <Setter Property="Foreground" Value="LimeGreen"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+    </Window.Resources>
+
+    <!--========================= MAIN LAYOUT =========================-->
+
+    <Grid Margin="15">
+
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="220"/>
+        </Grid.RowDefinitions>
+
+        <!--===================== CONNECTION PANEL =====================-->
+        <Border Grid.Row="0" Style="{StaticResource ModernPanel}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Username -->
+                <TextBlock Grid.Column="0" Text="Username:" 
+                           VerticalAlignment="Center"
+                           FontWeight="Bold" Margin="0,0,10,0"/>
+                <TextBox Grid.Column="1"
+                         Text="{Binding Username}"
+                         Padding="8"
+                         FontSize="14"/>
+
+                <!-- Server -->
+                <TextBlock Grid.Column="2" 
+                           Text="Server:" 
+                           VerticalAlignment="Center" 
+                           FontWeight="Bold" Margin="20,0,10,0"/>
+                <TextBox Grid.Column="3"
+                         Text="{Binding ServerAddress}"
+                         Padding="8"
+                         FontSize="14"/>
+
+                <!-- Connect Buttons -->
+                <StackPanel Grid.Column="4" Orientation="Horizontal">
+                    <Button Content="Connect" 
+                            Command="{Binding ConnectCommand}"
+                            Style="{StaticResource ModernButton}"/>
+                    <Button Content="Disconnect" 
+                            Command="{Binding DisconnectCommand}"
+                            Style="{StaticResource ModernButton}"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!--===================== MAIN CONTENT =====================-->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- PEER PANEL -->
+            <Border Grid.Column="0" Style="{StaticResource ModernPanel}">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top"
+                                Orientation="Horizontal" Margin="0,0,0,12">
+                        <TextBlock Text="Online Peers" 
+                                   FontSize="18"
+                                   FontWeight="Bold"/>
+
+                        <TextBlock Text="{Binding ConnectionStatus}"
+                                   Style="{StaticResource ConnectionStatusTextStyle}"/>
+
+                        <Button Content="Refresh" 
+                                Command="{Binding RefreshPeersCommand}"
+                                Style="{StaticResource ModernButton}"
+                                Margin="20,0"/>
+                        <Button Content="Scan LAN" 
+                                Command="{Binding ScanNetworkCommand}"
+                                Style="{StaticResource ModernButton}"/>
+                    </StackPanel>
+
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding Peers}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <views:PeerItemControl/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+
+            <!-- SHARED FILES PANEL -->
+            <Border Grid.Column="1" Style="{StaticResource ModernPanel}">
+                <DockPanel>
+
+                    <StackPanel DockPanel.Dock="Top"
+                                Orientation="Horizontal" Margin="0,0,0,12">
+                        <TextBlock Text="Shared Files" 
+                                   FontSize="18"
+                                   FontWeight="Bold"/>
+                        <Button Content="Add"
+                                Command="{Binding AddSharedFileCommand}"
+                                Style="{StaticResource ModernButton}"
+                                Margin="12,0"/>
+                    </StackPanel>
+
+                    <ScrollViewer>
+                        <ItemsControl ItemsSource="{Binding SharedFiles}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border BorderBrush="#eeeeee"
+                                            BorderThickness="0,0,0,1"
+                                            Padding="6">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="📄" Margin="0,0,8,0"/>
+                                            <TextBlock Text="{Binding FileName}" 
+                                                       FontWeight="SemiBold"/>
+                                            <TextBlock Text=" (" Margin="5,0,0,0"/>
+                                            <TextBlock Text="{Binding FileSize}"/>
+                                            <TextBlock Text=")"/>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+        </Grid>
+
+        <!--===================== TRANSFER PANEL =====================-->
+        <Border Grid.Row="2" Style="{StaticResource ModernPanel}">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Top"
+                           Text="File Transfers"
+                           FontSize="18"
+                           FontWeight="Bold"
+                           Margin="0,0,0,12"/>
+
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding Transfers}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <views:TransferItemControl/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+
     </Grid>
 </Window>
