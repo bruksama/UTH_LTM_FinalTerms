@@ -28,8 +28,6 @@ public class TransferViewModel : BaseViewModel
     private long _totalBytes;
     private bool _isCompleted;
     private bool _isFailed;
-
-    // Các thuộc tính mới
     private TransferDirection _direction;
     private string _directionText = string.Empty;
     private string _directionIcon = string.Empty;
@@ -42,7 +40,6 @@ public class TransferViewModel : BaseViewModel
     {
         OpenFileCommand = new RelayCommand(
             () => OpenFile(),
-            // CanExecute: Chỉ cho phép mở nếu đã hoàn thành VÀ có đường dẫn file
             () => IsCompleted && !string.IsNullOrEmpty(FullFilePath) && System.IO.File.Exists(FullFilePath)
         );
     }
@@ -133,7 +130,6 @@ public class TransferViewModel : BaseViewModel
         {
             if (SetProperty(ref _isCompleted, value))
             {
-                // Yêu cầu UI kiểm tra lại CanExecute của OpenFileCommand
                 CommandManager.InvalidateRequerySuggested();
             }
         }
@@ -193,7 +189,6 @@ public class TransferViewModel : BaseViewModel
         {
             if (SetProperty(ref _fullFilePath, value))
             {
-                // Yêu cầu UI kiểm tra lại CanExecute của OpenFileCommand
                 CommandManager.InvalidateRequerySuggested();
             }
         }
@@ -212,8 +207,7 @@ public class TransferViewModel : BaseViewModel
         if (_totalBytes > 0)
         {
             Progress = (_bytesTransferred * 100.0) / _totalBytes;
-
-            // Nếu đã đủ bytes thì mark completed (nếu chưa failed)
+            
             if (_bytesTransferred >= _totalBytes && _totalBytes > 0 && !IsFailed)
             {
                 MarkCompleted();
@@ -289,7 +283,6 @@ public class TransferViewModel : BaseViewModel
         }
         catch (Exception)
         {
-            // Fallback: Mở file trực tiếp (nếu explorer fail)
             try
             {
                 Process.Start(new ProcessStartInfo(FullFilePath) { UseShellExecute = true });
