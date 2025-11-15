@@ -19,6 +19,12 @@ public class FileTransferManager
     public event Action<string, string, string>? OnFileReceived;
     
     /// <summary>
+    /// Bắn event khi tiến độ transfer thay đổi
+    /// Params: (fileName, bytesTransferred, totalBytes, speedMbPerSecond)
+    /// </summary>
+    public event Action<string, long, long, double>? OnTransferProgress;
+    
+    /// <summary>
     /// Delegate để xử lý file transfer request trong GUI mode
     /// </summary>
     public delegate Task<bool> FileTransferRequestHandler(
@@ -31,7 +37,7 @@ public class FileTransferManager
     
     private readonly ClientConfig _config;
     private readonly ILogger _logger;
-    private readonly PerformanceMonitor _monitor; // Tích hợp PerformanceMonitor
+    private readonly PerformanceMonitor _monitor; // Đã thêm ở bước trước
     private ConsoleUI? _consoleUI;
     
     private TcpListener? _tcpListener;
@@ -44,13 +50,13 @@ public class FileTransferManager
     {
         _config = config;
         _logger = logger;
-        _monitor = new PerformanceMonitor(logger); // Khởi tạo PerformanceMonitor
+        _monitor = new PerformanceMonitor(logger); // Đã thêm ở bước trước
         _actualListenPort = config.ListenPort;
         _isReceiverRunning = false;
     }
 
     /// <summary>
-    /// Set ConsoleUI reference để có thể tạm dừng command loop khi chờ file transfer input
+    /// Set ConsoleUI reference
     /// </summary>
     public void SetConsoleUI(ConsoleUI? consoleUI)
     {
@@ -65,9 +71,6 @@ public class FileTransferManager
         _fileTransferRequestHandler = handler;
     }
 
-    /// <summary>
-    /// Lấy port thực tế đang được sử dụng để listen
-    /// </summary>
     public int GetActualListenPort()
     {
         if (!_isReceiverRunning)
@@ -78,9 +81,6 @@ public class FileTransferManager
         return _actualListenPort;
     }
 
-    /// <summary>
-    /// Kiểm tra xem receiver có đang chạy không
-    /// </summary>
     public bool IsReceiverRunning => _isReceiverRunning;
 
     /// <summary>
@@ -109,7 +109,6 @@ public class FileTransferManager
         var checksum = await ChecksumCalculator.CalculateSHA256Async(filePath);
         _logger.LogDebug($"File checksum: {checksum}");
 
-        // Bắt đầu đo
         var metrics = _monitor.StartMonitoring($"send_{fileName}");
 
         TcpClient? tcpClient = null;
@@ -185,15 +184,18 @@ public class FileTransferManager
                 totalBytesSent += bytesRead;
 
                 if (fileSize > 0) {
+                    var elapsed = DateTime.UtcNow - startTime;
+                    var speedMbPs = (elapsed.TotalSeconds > 0) ? (totalBytesSent / elapsed.TotalSeconds) / (1024 * 1024) : 0;
+
+                    // Cập nhật metrics và bắn event cho GUI (MỖI LẦN)
+                    _monitor.UpdateMetrics(metrics, totalBytesSent, elapsed);
+                    OnTransferProgress?.Invoke(fileName, totalBytesSent, fileSize, speedMbPs);
+                    
+                    // Chỉ log ra Console (MỖI 10%)
                     var progress = (double)totalBytesSent / fileSize * 100;
                     if (totalBytesSent % (fileSize / 10 + 1) == 0 || totalBytesSent == fileSize) {
-                        var elapsed = DateTime.UtcNow - startTime;
-                        var speed = totalBytesSent / elapsed.TotalSeconds / 1024 / 1024;
-                        
-                        _monitor.UpdateMetrics(metrics, totalBytesSent, elapsed);
-                        
-                        Console.WriteLine($"  Progress: {progress:F1}% ({totalBytesSent}/{fileSize} bytes, {speed:F2} MB/s)");
-                        _logger.LogInfo($"Transferred {totalBytesSent} of {fileSize} bytes ({progress:F1}%). Speed: {speed:F2} MB/s");
+                        Console.WriteLine($"  Progress: {progress:F1}% ({totalBytesSent}/{fileSize} bytes, {speedMbPs:F2} MB/s)");
+                        _logger.LogInfo($"Transferred {totalBytesSent} of {fileSize} bytes ({progress:F1}%). Speed: {speedMbPs:F2} MB/s");
                     }
                 }
             }
@@ -207,7 +209,6 @@ public class FileTransferManager
 
             var transferTime = DateTime.UtcNow - startTime;
             
-            // Kết thúc đo
             metrics.BytesTransferred = totalBytesSent;
             metrics.ElapsedTime = transferTime;
             _monitor.StopMonitoring(metrics);
@@ -252,6 +253,7 @@ public class FileTransferManager
     /// </summary>
     public void StartReceiver()
     {
+        // (Không thay đổi)
         if (_tcpListener != null && _receiverTask != null && !_receiverTask.IsCompleted) {
             _logger.LogWarning("File receiver is already running");
             return;
@@ -337,6 +339,7 @@ public class FileTransferManager
     /// </summary>
     private async Task ListenForConnectionsAsync(CancellationToken cancellationToken) 
     {
+        // (Không thay đổi)
         if (_tcpListener == null) return;
 
         _logger.LogInfo("File receiver listener started, waiting for connections...");
@@ -385,7 +388,7 @@ public class FileTransferManager
         CancellationTokenSource? fileDataCts = null;
         Task<string?>? inputTask = null;
 
-        string fileName = "unknown"; // Khai báo fileName ở scope rộng hơn
+        string fileName = "unknown"; 
         
         try
         {
@@ -412,7 +415,7 @@ public class FileTransferManager
                 return;
             }
 
-            fileName = requestMessage.FileName; // Gán giá trị
+            fileName = requestMessage.FileName;
             var fileSize = requestMessage.FileSize;
             var checksum = requestMessage.Checksum;
             
@@ -533,7 +536,6 @@ public class FileTransferManager
             long totalBytesReceived = 0;
             var startTime = DateTime.UtcNow;
 
-            // Bắt đầu đo
             var metrics = _monitor.StartMonitoring($"recv_{fileName}");
             
             Console.WriteLine("Receiving file data...");
@@ -551,15 +553,18 @@ public class FileTransferManager
 
                 if (fileSize > 0)
                 {
+                    var elapsed = DateTime.UtcNow - startTime;
+                    var speedMbPs = (elapsed.TotalSeconds > 0) ? (totalBytesReceived / elapsed.TotalSeconds) / (1024 * 1024) : 0;
+                    
+                    // Cập nhật metrics và bắn event cho GUI (MỖI LẦN)
+                    _monitor.UpdateMetrics(metrics, totalBytesReceived, elapsed);
+                    OnTransferProgress?.Invoke(fileName, totalBytesReceived, fileSize, speedMbPs);
+                    
+                    // Chỉ log ra Console (MỖI 10%)
                     var progress = (double)totalBytesReceived / fileSize * 100;
                     if (totalBytesReceived % (fileSize / 10 + 1) == 0 || totalBytesReceived == fileSize)
                     {
-                        var elapsed = DateTime.UtcNow - startTime;
-                        var speed = totalBytesReceived / elapsed.TotalSeconds / (1024 * 1024);
-                        
-                        _monitor.UpdateMetrics(metrics, totalBytesReceived, elapsed);
-                        
-                        Console.WriteLine($"  Progress: {progress:F1}% ({totalBytesReceived}/{fileSize} bytes, {speed:F2} MB/s)");
+                        Console.WriteLine($"  Progress: {progress:F1}% ({totalBytesReceived}/{fileSize} bytes, {speedMbPs:F2} MB/s)");
                     }
                 }
             }
@@ -579,7 +584,6 @@ public class FileTransferManager
             {
                 var transferTime = DateTime.UtcNow - startTime;
 
-                // Kết thúc đo
                 metrics.BytesTransferred = totalBytesReceived;
                 metrics.ElapsedTime = transferTime;
                 _monitor.StopMonitoring(metrics);

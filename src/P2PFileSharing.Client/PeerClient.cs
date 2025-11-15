@@ -2,7 +2,7 @@ using P2PFileSharing.Common.Configuration;
 using P2PFileSharing.Common.Infrastructure;
 using P2PFileSharing.Common.Models;
 using P2PFileSharing.Common.Utilities;
-using System.Threading; // Thêm 'using' cho CancellationTokenSource
+using System.Threading;
 
 namespace P2PFileSharing.Client;
 
@@ -17,6 +17,12 @@ public class PeerClient
     /// </summary>
     public event Action<string, string, string>? OnFileReceived;
 
+    /// <summary>
+    /// Bắn event khi tiến độ transfer thay đổi
+    /// Params: (fileName, bytesTransferred, totalBytes, speedMbPerSecond)
+    /// </summary>
+    public event Action<string, long, long, double>? OnTransferProgress;
+
     private readonly ClientConfig _config;
     private readonly ILogger _logger;
     private readonly ServerCommunicator _serverCommunicator;
@@ -24,7 +30,7 @@ public class PeerClient
     private readonly FileTransferManager _fileTransferManager;
     private bool _isRunning;
     private PeerInfo? _currentPeerInfo;
-    private CancellationTokenSource? _heartbeatCts; // Thêm CancellationTokenSource
+    private CancellationTokenSource? _heartbeatCts; 
 
     public PeerClient(ClientConfig config, ILogger logger)
     {
@@ -37,6 +43,12 @@ public class PeerClient
         _fileTransferManager.OnFileReceived += (fileName, savePath, fromPeer) =>
         {
             OnFileReceived?.Invoke(fileName, savePath, fromPeer);
+        };
+        
+        // Chuyển tiếp event tiến độ
+        _fileTransferManager.OnTransferProgress += (fileName, transferred, total, speed) =>
+        {
+            OnTransferProgress?.Invoke(fileName, transferred, total, speed);
         };
     }
 
@@ -88,7 +100,6 @@ public class PeerClient
             {
                 _logger.LogInfo($"Successfully registered with server as {_currentPeerInfo.Username} on {_currentPeerInfo.IpAddress}:{_currentPeerInfo.ListenPort}");
                 
-                // Bắt đầu vòng lặp Heartbeat
                 _heartbeatCts = new CancellationTokenSource();
                 _ = StartHeartbeatLoopAsync(_heartbeatCts.Token);
             }
@@ -113,7 +124,7 @@ public class PeerClient
     {
         if (!_isRunning) return;
 
-        _heartbeatCts?.Cancel(); // Dừng vòng lặp Heartbeat
+        _heartbeatCts?.Cancel(); 
 
         if (_currentPeerInfo != null && !string.IsNullOrEmpty(_currentPeerInfo.PeerId))
         {
@@ -179,8 +190,6 @@ public class PeerClient
     /// <summary>
     /// Gửi file đến một peer (FR-04)
     /// </summary>
-    /// <param name="peerName">Tên peer (username) hoặc IP:Port</param>
-    /// <param name="filePath">Đường dẫn file cần gửi</param>
     public async Task<bool> SendFileAsync(string peerName, string filePath)
     {
         try
@@ -275,7 +284,7 @@ public class PeerClient
     public bool IsRunning => _isRunning;
 
     /// <summary>
-    /// Set ConsoleUI reference để FileTransferManager có thể tạm dừng command loop
+    /// Set ConsoleUI reference
     /// </summary>
     public void SetConsoleUI(ConsoleUI? consoleUI)
     {
@@ -285,7 +294,6 @@ public class PeerClient
     /// <summary>
     /// Set handler cho incoming file transfer requests (cho GUI mode)
     /// </summary>
-    /// <param name="handler">Callback sẽ được gọi khi có file transfer request</param>
     public void SetFileTransferRequestHandler(
         FileTransferManager.FileTransferRequestHandler? handler)
     {
@@ -293,7 +301,7 @@ public class PeerClient
     }
 
     /// <summary>
-    /// Thay đổi username của peer và re-register với server nếu đang running
+    /// Thay đổi username của peer
     /// </summary>
     public async Task<bool> ChangeUsernameAsync(string newUsername)
     {
@@ -416,7 +424,7 @@ public class PeerClient
             catch (OperationCanceledException)
             {
                 _logger.LogInfo("Heartbeat loop stopped.");
-                break; // Thoát loop khi token bị cancel
+                break; 
             }
             catch (Exception ex)
             {
