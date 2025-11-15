@@ -6,29 +6,30 @@
              mc:Ignorable="d"
              d:DesignHeight="80"
              d:DesignWidth="600">
-    <UserControl.Resources>
-        <!-- Brush cho trạng thái Completed / Failed / Default -->
-        <SolidColorBrush x:Key="TransferNormalBrush" Color="#FF2196F3"/>
-        <SolidColorBrush x:Key="TransferCompletedBrush" Color="#FF4CAF50"/>
-        <SolidColorBrush x:Key="TransferFailedBrush" Color="#FFF44336"/>
 
-        <!-- Converter nhỏ bằng DataTrigger nên tạm dùng luôn Trigger, không cần class riêng -->
+    <UserControl.Resources>
+        <!-- Màu đồng bộ với main -->
+        <SolidColorBrush x:Key="TransferNormalBrush" Color="#4A90E2"/>
+        <SolidColorBrush x:Key="TransferCompletedBrush" Color="#22C55E"/>
+        <SolidColorBrush x:Key="TransferFailedBrush" Color="#EF4444"/>
+        <SolidColorBrush x:Key="TransferSubtleTextBrush" Color="#6B7280"/>
+
         <Style x:Key="StatusTextStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="Gray"/>
+            <Setter Property="Foreground" Value="{StaticResource TransferSubtleTextBrush}"/>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsCompleted}" Value="True">
-                    <Setter Property="Foreground" Value="#FF4CAF50"/>
+                    <Setter Property="Foreground" Value="{StaticResource TransferCompletedBrush}"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsFailed}" Value="True">
-                    <Setter Property="Foreground" Value="#FFF44336"/>
+                    <Setter Property="Foreground" Value="{StaticResource TransferFailedBrush}"/>
                 </DataTrigger>
             </Style.Triggers>
         </Style>
 
         <Style x:Key="ProgressBarStyle" TargetType="ProgressBar">
-            <Setter Property="Height" Value="16"/>
+            <Setter Property="Height" Value="10"/>
             <Setter Property="Foreground" Value="{StaticResource TransferNormalBrush}"/>
-            <Setter Property="Background" Value="#FFE0E0E0"/>
+            <Setter Property="Background" Value="#E5EDF9"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsCompleted}" Value="True">
@@ -43,11 +44,36 @@
 
     <Border Margin="4"
             Padding="10"
-            CornerRadius="8"
-            Background="White"
-            BorderBrush="#22000000"
+            CornerRadius="12"
+            Background="#FAFBFF"
+            BorderBrush="#E0E6F0"
             BorderThickness="1"
             SnapsToDevicePixels="True">
+
+        <Border.Effect>
+            <DropShadowEffect Color="#90A4AE"
+                              BlurRadius="10"
+                              ShadowDepth="1"
+                              Opacity="0.22"/>
+        </Border.Effect>
+
+        <Border.InputBindings>
+            <MouseBinding MouseAction="LeftDoubleClick"
+                          Command="{Binding OpenFileCommand}" />
+        </Border.InputBindings>
+
+        <Border.Style>
+            <Style TargetType="Border">
+                <Setter Property="Cursor" Value="Arrow" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsCompleted}" Value="True">
+                        <Setter Property="Cursor" Value="Hand" />
+                        <Setter Property="ToolTip" Value="{Binding FullFilePath}" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </Border.Style>
+
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -55,25 +81,33 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <!-- Dòng 1: icon + FileName + Peer -->
+            <!-- Row 0: tên file + peer -->
             <StackPanel Grid.Row="0"
                         Orientation="Horizontal"
                         VerticalAlignment="Center">
-                <TextBlock Text="⏬"
+                <!-- Direction icon (⬆ / ⬇…) -->
+                <TextBlock Text="{Binding DirectionIcon}"
                            FontSize="18"
-                           Margin="0,0,6,0"/>
+                           Margin="0,0,6,0"
+                           Foreground="{StaticResource TransferNormalBrush}"/>
+
                 <TextBlock Text="{Binding FileName}"
                            FontWeight="SemiBold"
-                           FontSize="13"/>
-                <TextBlock Text="  →  "
-                           Margin="6,0,0,0"
-                           Foreground="Gray"/>
-                <TextBlock Text="{Binding PeerName}"
                            FontSize="13"
-                           Foreground="#FF2196F3"/>
+                           Foreground="#1E293B"/>
+
+                <TextBlock Text="{Binding DirectionText}"
+                           Margin="6,0,0,0"
+                           Foreground="{StaticResource TransferSubtleTextBrush}"
+                           FontSize="12"/>
+
+                <TextBlock Text="{Binding PeerName}"
+                           FontSize="12"
+                           Margin="6,0,0,0"
+                           Foreground="{StaticResource TransferNormalBrush}"/>
             </StackPanel>
 
-            <!-- Dòng 2: Progress bar + phần trăm -->
+            <!-- Row 1: progress bar + % -->
             <Grid Grid.Row="1" Margin="0,6,0,2">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -90,11 +124,11 @@
                            Margin="8,0,0,0"
                            VerticalAlignment="Center"
                            FontSize="11"
-                           Foreground="Gray"
+                           Foreground="{StaticResource TransferSubtleTextBrush}"
                            Text="{Binding Progress, StringFormat={}{0:F0}%}"/>
             </Grid>
 
-            <!-- Dòng 3: Status + Speed -->
+            <!-- Row 2: status + speed -->
             <StackPanel Grid.Row="2"
                         Orientation="Horizontal"
                         Margin="0,2,0,0">
@@ -105,11 +139,11 @@
                 <TextBlock Text=" • "
                            Margin="4,0"
                            FontSize="11"
-                           Foreground="Gray"/>
+                           Foreground="{StaticResource TransferSubtleTextBrush}"/>
 
                 <TextBlock Text="{Binding Speed}"
                            FontSize="11"
-                           Foreground="DarkGreen"/>
+                           Foreground="#15803D"/>
             </StackPanel>
         </Grid>
     </Border>

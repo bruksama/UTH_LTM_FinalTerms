@@ -1,6 +1,18 @@
 using P2PFileSharing.Common.Models;
+using System;
+using System.Diagnostics;
+using System.Windows.Input;
 
 namespace P2PFileSharing.Client.GUI.ViewModels;
+
+/// <summary>
+/// Trạng thái của file trong danh sách
+/// </summary>
+public enum FileDirection
+{
+    Sharing, // Đang chia sẻ
+    Received // Đã nhận
+}
 
 /// <summary>
 /// ViewModel cho một file được chia sẻ
@@ -10,9 +22,17 @@ public class SharedFileViewModel : BaseViewModel
 {
     private readonly SharedFile _sharedFile;
 
+    private FileDirection _direction;
+    private string _directionIcon = string.Empty;
+
     public SharedFileViewModel(SharedFile sharedFile)
     {
         _sharedFile = sharedFile;
+
+        OpenFileCommand = new RelayCommand(
+            () => OpenFile(),
+            () => !string.IsNullOrEmpty(FullFilePath) && System.IO.File.Exists(FullFilePath)
+        );
     }
 
     /// <summary>
@@ -35,6 +55,80 @@ public class SharedFileViewModel : BaseViewModel
     /// Checksum của file (nếu cần hiển thị chi tiết)
     /// </summary>
     public string Checksum => _sharedFile.Checksum;
+    
+    /// <summary>
+    /// Hướng của file (Sharing/Received)
+    /// </summary>
+    public FileDirection Direction
+    {
+        get => _direction;
+        set
+        {
+            if (SetProperty(ref _direction, value))
+            {
+                DirectionIcon = value == FileDirection.Sharing ? "⏫" : "⏬";
+            }
+        }
+    }
+
+    /// <summary>
+    /// Icon chỉ hướng (Chia sẻ ⏫ / Đã nhận ⏬)
+    /// </summary>
+    public string DirectionIcon
+    {
+        get => _directionIcon;
+        set => SetProperty(ref _directionIcon, value);
+    }
+
+    /// <summary>
+    /// Đường dẫn đầy đủ đến file (để mở)
+    /// Lấy từ model
+    /// </summary>
+    public string FullFilePath
+    {
+        get => _sharedFile.FilePath;
+        set
+        {
+            if (_sharedFile.FilePath != value)
+            {
+                _sharedFile.FilePath = value;
+                OnPropertyChanged();
+                CommandManager.InvalidateRequerySuggested();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Command để mở file khi double-click
+    /// </summary>
+    public ICommand OpenFileCommand { get; }
+    
+    /// <summary>
+    /// Mở file (hoặc thư mục chứa file)
+    /// </summary>
+    private void OpenFile()
+    {
+        if (string.IsNullOrEmpty(FullFilePath) || !System.IO.File.Exists(FullFilePath))
+        {
+            return;
+        }
+
+        try
+        {
+            Process.Start("explorer.exe", $"/select,\"{FullFilePath}\"");
+        }
+        catch (Exception)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(FullFilePath) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to open file: {ex.Message}");
+            }
+        }
+    }
 
     /// <summary>
     /// Format file size: B, KB, MB, GB

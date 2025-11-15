@@ -12,31 +12,28 @@ namespace P2PFileSharing.Client;
 /// </summary>
 public class FileTransferManager
 {
-    // ✅ THÊM THEO TÀI LIỆU (Mục 4.1.1)
+    /// <summary>
+    /// Bắn event khi một file đã được nhận và lưu thành công
+    /// Params: (fileName, fullSavePath, fromPeer)
+    /// </summary>
+    public event Action<string, string, string>? OnFileReceived;
+    
     /// <summary>
     /// Delegate để xử lý file transfer request trong GUI mode
     /// </summary>
-    /// <param name="fileName">Tên file</param>
-    /// <param name="fileSize">Kích thước file (bytes)</param>
-    /// <param name="fromPeer">Địa chỉ peer gửi (IP:Port)</param>
-    /// <param name="checksum">Checksum của file</param>
-    /// <returns>true nếu chấp nhận, false nếu từ chối</returns>
     public delegate Task<bool> FileTransferRequestHandler(
         string fileName, 
         long fileSize, 
         string fromPeer, 
         string checksum);
-
-    // Field để lưu callback (null = console mode, not null = GUI mode)
+    
     private FileTransferRequestHandler? _fileTransferRequestHandler;
-    // ✅ KẾT THÚC THÊM (Mục 4.1.1)
-
-
+    
     private readonly ClientConfig _config;
     private readonly ILogger _logger;
+    private readonly PerformanceMonitor _monitor; // Tích hợp PerformanceMonitor
     private ConsoleUI? _consoleUI;
-
-    // Fields để quản lý receiver
+    
     private TcpListener? _tcpListener;
     private CancellationTokenSource? _receiverCts;
     private Task? _receiverTask;
@@ -47,6 +44,7 @@ public class FileTransferManager
     {
         _config = config;
         _logger = logger;
+        _monitor = new PerformanceMonitor(logger); // Khởi tạo PerformanceMonitor
         _actualListenPort = config.ListenPort;
         _isReceiverRunning = false;
     }
@@ -59,16 +57,13 @@ public class FileTransferManager
         _consoleUI = consoleUI;
     }
 
-    // ✅ THÊM THEO TÀI LIỆU (Mục 4.1.2)
     /// <summary>
     /// Set handler cho incoming file transfer requests (cho GUI mode)
-    /// Nếu handler != null, sẽ dùng handler thay vì Console.ReadLine()
     /// </summary>
     public void SetFileTransferRequestHandler(FileTransferRequestHandler? handler)
     {
         _fileTransferRequestHandler = handler;
     }
-    // ✅ KẾT THÚC THÊM (Mục 4.1.2)
 
     /// <summary>
     /// Lấy port thực tế đang được sử dụng để listen
@@ -93,7 +88,6 @@ public class FileTransferManager
     /// </summary>
     public async Task<bool> SendFileAsync(string peerIpAddress, int peerPort, string filePath)
     {
-        // (Phần này giữ nguyên, không thay đổi)
         if (string.IsNullOrEmpty(filePath))
         {
             _logger.LogError("File path is empty");
@@ -114,6 +108,9 @@ public class FileTransferManager
 
         var checksum = await ChecksumCalculator.CalculateSHA256Async(filePath);
         _logger.LogDebug($"File checksum: {checksum}");
+
+        // Bắt đầu đo
+        var metrics = _monitor.StartMonitoring($"send_{fileName}");
 
         TcpClient? tcpClient = null;
         NetworkStream? stream = null;
@@ -192,6 +189,9 @@ public class FileTransferManager
                     if (totalBytesSent % (fileSize / 10 + 1) == 0 || totalBytesSent == fileSize) {
                         var elapsed = DateTime.UtcNow - startTime;
                         var speed = totalBytesSent / elapsed.TotalSeconds / 1024 / 1024;
+                        
+                        _monitor.UpdateMetrics(metrics, totalBytesSent, elapsed);
+                        
                         Console.WriteLine($"  Progress: {progress:F1}% ({totalBytesSent}/{fileSize} bytes, {speed:F2} MB/s)");
                         _logger.LogInfo($"Transferred {totalBytesSent} of {fileSize} bytes ({progress:F1}%). Speed: {speed:F2} MB/s");
                     }
@@ -206,6 +206,12 @@ public class FileTransferManager
             }
 
             var transferTime = DateTime.UtcNow - startTime;
+            
+            // Kết thúc đo
+            metrics.BytesTransferred = totalBytesSent;
+            metrics.ElapsedTime = transferTime;
+            _monitor.StopMonitoring(metrics);
+            
             var throughput = fileSize / transferTime.TotalSeconds / (1024 * 1024);
             Console.WriteLine($"File sent successfully! ({throughput:F2} MB/s)");
             _logger.LogInfo($"File transfer completed: {fileName} ({fileSize} bytes) in {transferTime.TotalSeconds:F2}s ({throughput:F2} MB/s)");
@@ -246,7 +252,6 @@ public class FileTransferManager
     /// </summary>
     public void StartReceiver()
     {
-        // (Phần này giữ nguyên, không thay đổi)
         if (_tcpListener != null && _receiverTask != null && !_receiverTask.IsCompleted) {
             _logger.LogWarning("File receiver is already running");
             return;
@@ -332,7 +337,6 @@ public class FileTransferManager
     /// </summary>
     private async Task ListenForConnectionsAsync(CancellationToken cancellationToken) 
     {
-        // (Phần này giữ nguyên, không thay đổi)
         if (_tcpListener == null) return;
 
         _logger.LogInfo("File receiver listener started, waiting for connections...");
@@ -379,8 +383,10 @@ public class FileTransferManager
         FileStream? fileStream = null;
         CancellationTokenSource? messageCts = null;
         CancellationTokenSource? fileDataCts = null;
-        Task<string?>? inputTask = null; // Giữ lại 'inputTask' cho khối 'else'
+        Task<string?>? inputTask = null;
 
+        string fileName = "unknown"; // Khai báo fileName ở scope rộng hơn
+        
         try
         {
             tcpClient.SendTimeout = (int)ProtocolConstants.ReadWriteTimeout.TotalMilliseconds;
@@ -406,42 +412,37 @@ public class FileTransferManager
                 return;
             }
 
-            var fileName = requestMessage.FileName;
+            fileName = requestMessage.FileName; // Gán giá trị
             var fileSize = requestMessage.FileSize;
             var checksum = requestMessage.Checksum;
-
-            // ✅ SỬA THEO TÀI LIỆU (Mục 4.1.3)
-            // Hiển thị thông tin file transfer request
+            
             bool accepted = false;
             string? userInput = null;
 
             if (_fileTransferRequestHandler != null)
             {
-                // ===== GUI MODE: Dùng callback =====
                 _logger.LogInfo($"File transfer request received. Calling GUI handler...");
                 
                 try
                 {
-                    // Gọi callback và đợi user response từ GUI
                     accepted = await _fileTransferRequestHandler(
                         fileName, 
                         fileSize, 
                         remoteEndPoint, 
                         checksum ?? "");
                     
-                    userInput = accepted ? "User accepted" : "User rejected"; // Cập nhật userInput để dùng cho ErrorMessage
+                    userInput = accepted ? "User accepted" : "User rejected"; 
                     _logger.LogInfo($"GUI handler returned: {(accepted ? "Accepted" : "Rejected")}");
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError($"Error in file transfer request handler: {ex.Message}", ex);
                     accepted = false;
-                    userInput = "Handler error";
+                    userInput = "Handler error"; 
                 }
             }
             else
             {
-                // ===== CONSOLE MODE: Dùng Console.ReadLine() (Logic cũ) =====
                 Console.WriteLine();
                 Console.WriteLine("═══════════════════════════════════════════════════════");
                 Console.WriteLine("  Incoming File Transfer Request");
@@ -472,13 +473,11 @@ public class FileTransferManager
                 {
                     Console.WriteLine("\nTimeout - Transfer rejected (no response within 30 seconds)");
                     accepted = false;
-                    userInput = null; // Để ErrorMessage thành "Timeout"
+                    userInput = null; 
                 }
                 
                 _consoleUI?.SetWaitingForFileTransferInput(false);
             }
-            // ✅ KẾT THÚC SỬA (Mục 4.1.3)
-
 
             if (!Directory.Exists(_config.DownloadDirectory))
             {
@@ -516,7 +515,6 @@ public class FileTransferManager
                 {
                     Accepted = false,
                     FileName = fileName,
-                    // Giữ nguyên logic cũ: nếu userInput là null (do timeout) thì báo Timeout
                     ErrorMessage = userInput == null ? "Timeout" : "User rejected" 
                 };
                 Console.WriteLine("\n✗ File transfer rejected.");
@@ -535,6 +533,9 @@ public class FileTransferManager
             long totalBytesReceived = 0;
             var startTime = DateTime.UtcNow;
 
+            // Bắt đầu đo
+            var metrics = _monitor.StartMonitoring($"recv_{fileName}");
+            
             Console.WriteLine("Receiving file data...");
 
             while (totalBytesReceived < fileSize && !fileDataCts.Token.IsCancellationRequested)
@@ -555,6 +556,9 @@ public class FileTransferManager
                     {
                         var elapsed = DateTime.UtcNow - startTime;
                         var speed = totalBytesReceived / elapsed.TotalSeconds / (1024 * 1024);
+                        
+                        _monitor.UpdateMetrics(metrics, totalBytesReceived, elapsed);
+                        
                         Console.WriteLine($"  Progress: {progress:F1}% ({totalBytesReceived}/{fileSize} bytes, {speed:F2} MB/s)");
                     }
                 }
@@ -573,6 +577,13 @@ public class FileTransferManager
             }
             else
             {
+                var transferTime = DateTime.UtcNow - startTime;
+
+                // Kết thúc đo
+                metrics.BytesTransferred = totalBytesReceived;
+                metrics.ElapsedTime = transferTime;
+                _monitor.StopMonitoring(metrics);
+                
                 bool checksumValid = true;
                 if (!string.IsNullOrEmpty(checksum))
                 {
@@ -583,6 +594,8 @@ public class FileTransferManager
                     {
                         Console.WriteLine($"\n✓ File received successfully!");
                         Console.WriteLine($"✓ Checksum verification: PASSED");
+
+                        OnFileReceived?.Invoke(fileName, savePath, remoteEndPoint);
                     }
                     else
                     {
@@ -591,15 +604,19 @@ public class FileTransferManager
                         Console.WriteLine($"  Received: {receivedChecksum}");
                     }
                 }
+                else
+                {
+                    Console.WriteLine($"\n✓ File received successfully! (No checksum provided)");
+                    OnFileReceived?.Invoke(fileName, savePath, remoteEndPoint);
+                }
 
-                var transferTime = DateTime.UtcNow - startTime;
                 var throughput = fileSize / transferTime.TotalSeconds / (1024 * 1024);
                 Console.WriteLine($"  Saved to: {savePath}");
                 Console.WriteLine($"  Transfer time: {transferTime.TotalSeconds:F2}s ({throughput:F2} MB/s)");
                 Console.WriteLine("═══════════════════════════════════════════════════════");
                 Console.WriteLine();
                 
-                _logger.LogInfo($"File transfer completed from {remoteEndPoint}: {fileName} ({fileSize} bytes) in {transferTime.TotalSeconds:F2}s ({throughput:F2} MB/s)");
+                _logger.LogInfo($"File transfer completed from {fileName}: {fileName} ({fileSize} bytes) in {transferTime.TotalSeconds:F2}s ({throughput:F2} MB/s)");
             }
         }
         catch (OperationCanceledException)
@@ -627,7 +644,6 @@ public class FileTransferManager
             messageCts?.Dispose();
             fileDataCts?.Dispose();
             
-            // Giữ lại logic cleanup 'inputTask' cho khối 'else'
             if (inputTask != null && !inputTask.IsCompleted)
             {
                 _ = Task.Run(async () =>
@@ -651,7 +667,6 @@ public class FileTransferManager
     /// </summary>
     public void StopReceiver()
     {
-        // (Phần này giữ nguyên, không thay đổi)
         if (_tcpListener == null)
         {
             _logger.LogWarning("File receiver is not running");
@@ -694,7 +709,6 @@ public class FileTransferManager
 
     private static string FormatFileSize(long bytes)
     {
-        // (Phần này giữ nguyên, không thay đổi)
         string[] sizes = { "B", "KB", "MB", "GB", "TB" };
         double len = bytes;
         int order = 0;

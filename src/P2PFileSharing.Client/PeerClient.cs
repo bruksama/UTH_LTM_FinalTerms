@@ -2,15 +2,21 @@ using P2PFileSharing.Common.Configuration;
 using P2PFileSharing.Common.Infrastructure;
 using P2PFileSharing.Common.Models;
 using P2PFileSharing.Common.Utilities;
+using System.Threading; // Thêm 'using' cho CancellationTokenSource
 
 namespace P2PFileSharing.Client;
 
 /// <summary>
 /// Main client class - quản lý peer client
-/// TODO: Implement client lifecycle và coordination giữa các components
 /// </summary>
 public class PeerClient
 {
+    /// <summary>
+    /// Bắn event khi một file đã được nhận và lưu thành công
+    /// Params: (fileName, fullSavePath, fromPeer)
+    /// </summary>
+    public event Action<string, string, string>? OnFileReceived;
+
     private readonly ClientConfig _config;
     private readonly ILogger _logger;
     private readonly ServerCommunicator _serverCommunicator;
@@ -18,6 +24,7 @@ public class PeerClient
     private readonly FileTransferManager _fileTransferManager;
     private bool _isRunning;
     private PeerInfo? _currentPeerInfo;
+    private CancellationTokenSource? _heartbeatCts; // Thêm CancellationTokenSource
 
     public PeerClient(ClientConfig config, ILogger logger)
     {
@@ -26,6 +33,11 @@ public class PeerClient
         _serverCommunicator = new ServerCommunicator(config, logger);
         _udpDiscovery = new UdpDiscovery(config, logger);
         _fileTransferManager = new FileTransferManager(config, logger);
+        
+        _fileTransferManager.OnFileReceived += (fileName, savePath, fromPeer) =>
+        {
+            OnFileReceived?.Invoke(fileName, savePath, fromPeer);
+        };
     }
 
     /// <summary>
@@ -75,6 +87,10 @@ public class PeerClient
             if (registered)
             {
                 _logger.LogInfo($"Successfully registered with server as {_currentPeerInfo.Username} on {_currentPeerInfo.IpAddress}:{_currentPeerInfo.ListenPort}");
+                
+                // Bắt đầu vòng lặp Heartbeat
+                _heartbeatCts = new CancellationTokenSource();
+                _ = StartHeartbeatLoopAsync(_heartbeatCts.Token);
             }
             else
             {
@@ -96,6 +112,8 @@ public class PeerClient
     public async Task StopAsync()
     {
         if (!_isRunning) return;
+
+        _heartbeatCts?.Cancel(); // Dừng vòng lặp Heartbeat
 
         if (_currentPeerInfo != null && !string.IsNullOrEmpty(_currentPeerInfo.PeerId))
         {
@@ -374,5 +392,36 @@ public class PeerClient
 
         _logger.LogInfo($"Username changed from '{oldUsername}' to '{newUsername}'");
         return true;
+    }
+    
+    /// <summary>
+    /// Vòng lặp chạy ngầm để gửi Heartbeat định kỳ
+    /// </summary>
+    private async Task StartHeartbeatLoopAsync(CancellationToken token)
+    {
+        var interval = TimeSpan.FromSeconds(_config.HeartbeatIntervalSeconds);
+        
+        while (_isRunning && !token.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(interval, token);
+
+                if (_currentPeerInfo != null && !string.IsNullOrEmpty(_currentPeerInfo.PeerId))
+                {
+                    _logger.LogDebug($"Sending heartbeat for PeerId={_currentPeerInfo.PeerId}");
+                    await _serverCommunicator.SendHeartbeatAsync(_currentPeerInfo.PeerId);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogInfo("Heartbeat loop stopped.");
+                break; // Thoát loop khi token bị cancel
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning($"Error in heartbeat loop: {ex.Message}");
+            }
+        }
     }
 }
