@@ -486,7 +486,7 @@
                                                            FontWeight="SemiBold"
                                                            Foreground="{StaticResource HeaderTextBrush}"/>
                                                 <TextBlock Foreground="{StaticResource SubtleTextBrush}">
-                                                    <Run Text="{Binding FileSize}"/>
+                                                    <Run Text="{Binding FileSize, Mode = OneWay}"/>
                                                 </TextBlock>
                                             </StackPanel>
                                         </StackPanel>
