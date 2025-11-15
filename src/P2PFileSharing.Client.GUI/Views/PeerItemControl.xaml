@@ -4,7 +4,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
-             d:DesignHeight="200"
+             d:DesignHeight="125"
              d:DesignWidth="400">
 
     <UserControl.Resources>
@@ -43,12 +43,13 @@
     </UserControl.Resources>
 
     <!-- Card peer -->
-    <Border Margin="6,4"
+    <Border x:Name="DropZoneBorder"
+            Style="{StaticResource DropZoneStyle}"
+            Margin="6,4"
             Padding="12"
             CornerRadius="14"
-            Background="{StaticResource PeerCardBackgroundBrush}"
-            BorderBrush="{StaticResource PeerBorderBrush}"
             BorderThickness="1"
+            AllowDrop="True"
             SnapsToDevicePixels="True">
         <Border.Effect>
             <DropShadowEffect Color="#90A4AE"
@@ -97,63 +98,6 @@
                                Margin="0,2,0,0"/>
                 </StackPanel>
             </StackPanel>
-
-            <!-- Shared Files -->
-            <StackPanel Margin="0,10,0,0">
-                <TextBlock Text="Shared Files"
-                           FontWeight="SemiBold"
-                           FontSize="12"
-                           Foreground="{StaticResource PeerHeaderTextBrush}"/>
-
-                <ItemsControl ItemsSource="{Binding SharedFiles}"
-                              Margin="8,4,0,4">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <StackPanel Orientation="Horizontal"
-                                        Margin="0,2">
-                                <TextBlock Text="📁"
-                                           Margin="0,0,5,0"/>
-                                <TextBlock Text="{Binding FileName}"
-                                           Foreground="{StaticResource PeerHeaderTextBrush}"
-                                           FontSize="12"/>
-                                <TextBlock Text=" ("
-                                           Margin="4,0,0,0"
-                                           FontSize="12"
-                                           Foreground="{StaticResource PeerSubtleTextBrush}"/>
-                                <TextBlock Text="{Binding FileSize}"
-                                           FontSize="12"
-                                           Foreground="{StaticResource PeerSubtleTextBrush}"/>
-                                <TextBlock Text=")"
-                                           FontSize="12"
-                                           Foreground="{StaticResource PeerSubtleTextBrush}"/>
-                            </StackPanel>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </StackPanel>
-
-            <!-- Drop Zone (drag & drop để gửi file) -->
-            <Border x:Name="DropZoneBorder"
-                    Style="{StaticResource DropZoneStyle}"
-                    MinHeight="70"
-                    Margin="0,8,0,0"
-                    AllowDrop="True">
-                <StackPanel HorizontalAlignment="Center"
-                            VerticalAlignment="Center">
-                    <TextBlock Text="Drop files here to send"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"
-                               Foreground="{StaticResource DropZoneTextBrush}"
-                               FontStyle="Italic"
-                               FontSize="12"/>
-                    <TextBlock Text="(Drag and drop files to share with this peer)"
-                               HorizontalAlignment="Center"
-                               Margin="0,4,0,0"
-                               Foreground="#9CA3AF"
-                               FontSize="11"/>
-                </StackPanel>
-            </Border>
-
         </StackPanel>
     </Border>
 </UserControl>

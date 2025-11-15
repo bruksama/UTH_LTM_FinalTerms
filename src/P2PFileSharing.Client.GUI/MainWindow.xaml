@@ -389,7 +389,7 @@
                         <StackPanel Orientation="Vertical">
                             <TextBlock Text="Online Peers"
                                        Style="{StaticResource SectionTitleTextStyle}" />
-                            <TextBlock Text="Devices detected in your LAN – click a peer to start sharing."
+                            <TextBlock Text="Drag and drop the file into the profile to send it."
                                        Style="{StaticResource SubtleLabelTextStyle}"/>
                         </StackPanel>
 
