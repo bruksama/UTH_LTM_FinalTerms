@@ -28,10 +28,10 @@ public class FileTransferManager
         string checksum);
     
     private FileTransferRequestHandler? _fileTransferRequestHandler;
-
-
+    
     private readonly ClientConfig _config;
     private readonly ILogger _logger;
+    private readonly PerformanceMonitor _monitor; // Tích hợp PerformanceMonitor
     private ConsoleUI? _consoleUI;
     
     private TcpListener? _tcpListener;
@@ -44,6 +44,7 @@ public class FileTransferManager
     {
         _config = config;
         _logger = logger;
+        _monitor = new PerformanceMonitor(logger); // Khởi tạo PerformanceMonitor
         _actualListenPort = config.ListenPort;
         _isReceiverRunning = false;
     }
@@ -107,6 +108,9 @@ public class FileTransferManager
 
         var checksum = await ChecksumCalculator.CalculateSHA256Async(filePath);
         _logger.LogDebug($"File checksum: {checksum}");
+
+        // Bắt đầu đo
+        var metrics = _monitor.StartMonitoring($"send_{fileName}");
 
         TcpClient? tcpClient = null;
         NetworkStream? stream = null;
@@ -185,6 +189,9 @@ public class FileTransferManager
                     if (totalBytesSent % (fileSize / 10 + 1) == 0 || totalBytesSent == fileSize) {
                         var elapsed = DateTime.UtcNow - startTime;
                         var speed = totalBytesSent / elapsed.TotalSeconds / 1024 / 1024;
+                        
+                        _monitor.UpdateMetrics(metrics, totalBytesSent, elapsed);
+                        
                         Console.WriteLine($"  Progress: {progress:F1}% ({totalBytesSent}/{fileSize} bytes, {speed:F2} MB/s)");
                         _logger.LogInfo($"Transferred {totalBytesSent} of {fileSize} bytes ({progress:F1}%). Speed: {speed:F2} MB/s");
                     }
@@ -199,6 +206,12 @@ public class FileTransferManager
             }
 
             var transferTime = DateTime.UtcNow - startTime;
+            
+            // Kết thúc đo
+            metrics.BytesTransferred = totalBytesSent;
+            metrics.ElapsedTime = transferTime;
+            _monitor.StopMonitoring(metrics);
+            
             var throughput = fileSize / transferTime.TotalSeconds / (1024 * 1024);
             Console.WriteLine($"File sent successfully! ({throughput:F2} MB/s)");
             _logger.LogInfo($"File transfer completed: {fileName} ({fileSize} bytes) in {transferTime.TotalSeconds:F2}s ({throughput:F2} MB/s)");
@@ -372,6 +385,8 @@ public class FileTransferManager
         CancellationTokenSource? fileDataCts = null;
         Task<string?>? inputTask = null;
 
+        string fileName = "unknown"; // Khai báo fileName ở scope rộng hơn
+        
         try
         {
             tcpClient.SendTimeout = (int)ProtocolConstants.ReadWriteTimeout.TotalMilliseconds;
@@ -397,7 +412,7 @@ public class FileTransferManager
                 return;
             }
 
-            var fileName = requestMessage.FileName;
+            fileName = requestMessage.FileName; // Gán giá trị
             var fileSize = requestMessage.FileSize;
             var checksum = requestMessage.Checksum;
             
@@ -464,7 +479,6 @@ public class FileTransferManager
                 _consoleUI?.SetWaitingForFileTransferInput(false);
             }
 
-
             if (!Directory.Exists(_config.DownloadDirectory))
             {
                 Directory.CreateDirectory(_config.DownloadDirectory);
@@ -519,6 +533,9 @@ public class FileTransferManager
             long totalBytesReceived = 0;
             var startTime = DateTime.UtcNow;
 
+            // Bắt đầu đo
+            var metrics = _monitor.StartMonitoring($"recv_{fileName}");
+            
             Console.WriteLine("Receiving file data...");
 
             while (totalBytesReceived < fileSize && !fileDataCts.Token.IsCancellationRequested)
@@ -539,6 +556,9 @@ public class FileTransferManager
                     {
                         var elapsed = DateTime.UtcNow - startTime;
                         var speed = totalBytesReceived / elapsed.TotalSeconds / (1024 * 1024);
+                        
+                        _monitor.UpdateMetrics(metrics, totalBytesReceived, elapsed);
+                        
                         Console.WriteLine($"  Progress: {progress:F1}% ({totalBytesReceived}/{fileSize} bytes, {speed:F2} MB/s)");
                     }
                 }
@@ -557,6 +577,13 @@ public class FileTransferManager
             }
             else
             {
+                var transferTime = DateTime.UtcNow - startTime;
+
+                // Kết thúc đo
+                metrics.BytesTransferred = totalBytesReceived;
+                metrics.ElapsedTime = transferTime;
+                _monitor.StopMonitoring(metrics);
+                
                 bool checksumValid = true;
                 if (!string.IsNullOrEmpty(checksum))
                 {
@@ -583,15 +610,13 @@ public class FileTransferManager
                     OnFileReceived?.Invoke(fileName, savePath, remoteEndPoint);
                 }
 
-
-                var transferTime = DateTime.UtcNow - startTime;
                 var throughput = fileSize / transferTime.TotalSeconds / (1024 * 1024);
                 Console.WriteLine($"  Saved to: {savePath}");
                 Console.WriteLine($"  Transfer time: {transferTime.TotalSeconds:F2}s ({throughput:F2} MB/s)");
                 Console.WriteLine("═══════════════════════════════════════════════════════");
                 Console.WriteLine();
                 
-                _logger.LogInfo($"File transfer completed from {remoteEndPoint}: {fileName} ({fileSize} bytes) in {transferTime.TotalSeconds:F2}s ({throughput:F2} MB/s)");
+                _logger.LogInfo($"File transfer completed from {fileName}: {fileName} ({fileSize} bytes) in {transferTime.TotalSeconds:F2}s ({throughput:F2} MB/s)");
             }
         }
         catch (OperationCanceledException)
