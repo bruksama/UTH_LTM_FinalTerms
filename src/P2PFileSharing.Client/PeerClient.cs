@@ -7,10 +7,16 @@ namespace P2PFileSharing.Client;
 
 /// <summary>
 /// Main client class - quản lý peer client
-/// TODO: Implement client lifecycle và coordination giữa các components
 /// </summary>
 public class PeerClient
 {
+    // ✅ THÊM 1 EVENT MỚI (Mục 2)
+    /// <summary>
+    /// Bắn event khi một file đã được nhận và lưu thành công
+    /// Params: (fileName, fullSavePath, fromPeer)
+    /// </summary>
+    public event Action<string, string, string>? OnFileReceived;
+
     private readonly ClientConfig _config;
     private readonly ILogger _logger;
     private readonly ServerCommunicator _serverCommunicator;
@@ -26,6 +32,11 @@ public class PeerClient
         _serverCommunicator = new ServerCommunicator(config, logger);
         _udpDiscovery = new UdpDiscovery(config, logger);
         _fileTransferManager = new FileTransferManager(config, logger);
+        
+        _fileTransferManager.OnFileReceived += (fileName, savePath, fromPeer) =>
+        {
+            OnFileReceived?.Invoke(fileName, savePath, fromPeer);
+        };
     }
 
     /// <summary>
