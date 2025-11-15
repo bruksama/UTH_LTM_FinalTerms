@@ -7,12 +7,10 @@
              d:DesignHeight="80"
              d:DesignWidth="600">
     <UserControl.Resources>
-        <!-- Brush cho trạng thái Completed / Failed / Default -->
         <SolidColorBrush x:Key="TransferNormalBrush" Color="#FF2196F3"/>
         <SolidColorBrush x:Key="TransferCompletedBrush" Color="#FF4CAF50"/>
         <SolidColorBrush x:Key="TransferFailedBrush" Color="#FFF44336"/>
 
-        <!-- Converter nhỏ bằng DataTrigger nên tạm dùng luôn Trigger, không cần class riêng -->
         <Style x:Key="StatusTextStyle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="Gray"/>
             <Style.Triggers>
@@ -48,6 +46,23 @@
             BorderBrush="#22000000"
             BorderThickness="1"
             SnapsToDevicePixels="True">
+        
+        <Border.InputBindings>
+            <MouseBinding MouseAction="LeftDoubleClick"
+                          Command="{Binding OpenFileCommand}" />
+        </Border.InputBindings>
+        
+        <Border.Style>
+            <Style TargetType="Border">
+                <Setter Property="Cursor" Value="Arrow" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsCompleted}" Value="True">
+                        <Setter Property="Cursor" Value="Hand" />
+                        <Setter Property="ToolTip" Value="{Binding FullFilePath}" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </Border.Style>
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -55,25 +70,28 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <!-- Dòng 1: icon + FileName + Peer -->
             <StackPanel Grid.Row="0"
                         Orientation="Horizontal"
                         VerticalAlignment="Center">
-                <TextBlock Text="⏬"
+                
+                <TextBlock Text="{Binding DirectionIcon}"
                            FontSize="18"
                            Margin="0,0,6,0"/>
+                
                 <TextBlock Text="{Binding FileName}"
                            FontWeight="SemiBold"
                            FontSize="13"/>
-                <TextBlock Text="  →  "
+                
+                <TextBlock Text="{Binding DirectionText}"
                            Margin="6,0,0,0"
                            Foreground="Gray"/>
+                
                 <TextBlock Text="{Binding PeerName}"
                            FontSize="13"
+                           Margin="6,0,0,0"
                            Foreground="#FF2196F3"/>
             </StackPanel>
 
-            <!-- Dòng 2: Progress bar + phần trăm -->
             <Grid Grid.Row="1" Margin="0,6,0,2">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -94,7 +112,6 @@
                            Text="{Binding Progress, StringFormat={}{0:F0}%}"/>
             </Grid>
 
-            <!-- Dòng 3: Status + Speed -->
             <StackPanel Grid.Row="2"
                         Orientation="Horizontal"
                         Margin="0,2,0,0">

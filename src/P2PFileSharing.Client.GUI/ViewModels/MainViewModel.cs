@@ -1,11 +1,12 @@
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using P2PFileSharing.Client;
 using P2PFileSharing.Common.Configuration;
 using P2PFileSharing.Common.Infrastructure;
 using P2PFileSharing.Common.Models;
-using P2PFileSharing.Common.Models.Messages; // ✅ THÊM THEO TÀI LIỆU
+using P2PFileSharing.Common.Models.Messages;
 
 namespace P2PFileSharing.Client.GUI.ViewModels;
 
@@ -63,7 +64,7 @@ public class MainViewModel : BaseViewModel
 
     #region Properties
 
-    // (Vùng này giữ nguyên, không thay đổi)
+    // (Vùng này giữ nguyên)
     public string Username
     {
         get => _username;
@@ -121,7 +122,7 @@ public class MainViewModel : BaseViewModel
 
     #region Commands
     
-    // (Vùng này giữ nguyên, không thay đổi)
+    // (Vùng này giữ nguyên)
     public ICommand ConnectCommand { get; }
     public ICommand DisconnectCommand { get; }
     public ICommand RefreshPeersCommand { get; }
@@ -157,9 +158,9 @@ public class MainViewModel : BaseViewModel
 
             _peerClient = new PeerClient(_config, _logger);
             await _peerClient.StartAsync();
-
-            // ✅ THÊM THEO TÀI LIỆU (Mục 4.3.1)
+            
             _peerClient.SetFileTransferRequestHandler(HandleIncomingFileTransferRequestAsync);
+            _peerClient.OnFileReceived += HandleFileReceived; 
 
             if (_peerClient.IsRunning)
             {
@@ -201,8 +202,8 @@ public class MainViewModel : BaseViewModel
         {
             if (_peerClient != null)
             {
-                // ✅ THÊM THEO TÀI LIỆU (Mục 4.3.3)
                 _peerClient.SetFileTransferRequestHandler(null);
+                _peerClient.OnFileReceived -= HandleFileReceived;
                 
                 await _peerClient.StopAsync();
                 _peerClient = null;
@@ -230,7 +231,6 @@ public class MainViewModel : BaseViewModel
     /// </summary>
     private async Task RefreshPeersAsync()
     {
-        // (Phần này giữ nguyên, không thay đổi)
         if (_peerClient == null || !_peerClient.IsRunning)
         {
             MessageBox.Show("Please connect to server first.",
@@ -276,7 +276,6 @@ public class MainViewModel : BaseViewModel
     /// </summary>
     private async Task ScanNetworkAsync()
     {
-        // (Phần này giữ nguyên, không thay đổi)
         if (_peerClient == null || !_peerClient.IsRunning)
         {
             MessageBox.Show("Please connect to server first.",
@@ -324,7 +323,6 @@ public class MainViewModel : BaseViewModel
     /// </summary>
     private void AddSharedFile()
     {
-        // (Phần này giữ nguyên, không thay đổi)
         try
         {
             var dialog = new Microsoft.Win32.OpenFileDialog
@@ -342,14 +340,22 @@ public class MainViewModel : BaseViewModel
                     if (!fileInfo.Exists)
                         continue;
 
+                    // ✅ SỬA KHỐI NÀY
                     var sharedFile = new SharedFile
                     {
                         FileName = fileInfo.Name,
-                        FilePath = filePath,
+                        FilePath = filePath, // Đường dẫn đầy đủ
                         FileSize = fileInfo.Length
                     };
+                    
+                    // Tạo ViewModel và set trạng thái
+                    var vm = new SharedFileViewModel(sharedFile)
+                    {
+                        Direction = FileDirection.Sharing // Trạng thái Đang chia sẻ
+                    };
 
-                    SharedFiles.Add(new SharedFileViewModel(sharedFile));
+                    SharedFiles.Add(vm);
+                    
                     _logger.LogInfo($"Added shared file: {fileInfo.Name}");
                 }
             }
@@ -368,7 +374,6 @@ public class MainViewModel : BaseViewModel
     /// </summary>
     private void UpdatePeersList(List<PeerInfo> peerInfos)
     {
-        // (Phần này giữ nguyên, không thay đổi)
         Application.Current.Dispatcher.Invoke(() =>
         {
             Peers.Clear();
@@ -389,7 +394,6 @@ public class MainViewModel : BaseViewModel
     /// </summary>
     public async Task HandleFileDropAsync(PeerViewModel peer, IEnumerable<string> filePaths)
     {
-        // (Phần này giữ nguyên, không thay đổi)
         try
         {
             if (!peer.IsOnline)
@@ -401,7 +405,7 @@ public class MainViewModel : BaseViewModel
             if (_peerClient == null || !_peerClient.IsRunning)
             {
                 MessageBox.Show("Client is not connected.", "Error",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
@@ -412,12 +416,16 @@ public class MainViewModel : BaseViewModel
 
                 var fileInfo = new System.IO.FileInfo(filePath);
 
+                // KHỐI NÀY SẼ THÊM VÀO "FILE TRANSFERS" (BÊN DƯỚI)
                 var transfer = new TransferViewModel
                 {
                     FileName   = fileInfo.Name,
                     PeerName   = peer.Username,
                     TotalBytes = fileInfo.Length,
                     Status     = "Sending..."
+                    // (Bạn có thể thêm Direction/FullFilePath ở đây nếu muốn
+                    // danh sách "File Transfers" cũng có thể mở file, nhưng
+                    // theo yêu cầu của bạn, chúng ta tập trung vào "Shared Files")
                 };
 
                 Application.Current.Dispatcher.Invoke(() => Transfers.Add(transfer));
@@ -447,23 +455,47 @@ public class MainViewModel : BaseViewModel
     /// <summary>
     /// Xử lý khi nhận được file từ peer khác
     /// </summary>
-    public void HandleFileReceived(string fileName, string fromPeer)
+    public void HandleFileReceived(string fileName, string fullSavePath, string fromPeer)
     {
-        // (Phần này giữ nguyên, không thay đổi)
+        // Thêm file đã nhận vào danh sách "Shared Files" (bên phải)
         Application.Current.Dispatcher.Invoke(() =>
         {
-            MessageBox.Show(
-                $"Received file: {fileName} from {fromPeer}",
-                "File Received", MessageBoxButton.OK, MessageBoxImage.Information);
+            try
+            {
+                _logger.LogInfo($"GUI received file: {fileName} from {fromPeer}. Path: {fullSavePath}");
+                
+                long fileSize = 0;
+                if (File.Exists(fullSavePath))
+                {
+                    fileSize = new FileInfo(fullSavePath).Length;
+                }
 
-            _logger.LogInfo($"Received file: {fileName} from {fromPeer}");
+                // Tạo SharedFile model
+                var sharedFile = new SharedFile
+                {
+                    FileName = fileName,
+                    FilePath = fullSavePath, // Đường dẫn đầy đủ để mở
+                    FileSize = fileSize
+                };
+
+                // Tạo ViewModel và set trạng thái
+                var vm = new SharedFileViewModel(sharedFile)
+                {
+                    Direction = FileDirection.Received // Trạng thái Đã nhận
+                };
+
+                SharedFiles.Add(vm); // Thêm vào danh sách BÊN PHẢI
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error adding received file to UI: {ex.Message}", ex);
+            }
         });
     }
 
-    // ✅ THÊM 2 PHƯƠNG THỨC MỚI THEO TÀI LIỆU (Mục 4.3.2)
+
     /// <summary>
     /// Xử lý yêu cầu chuyển file đến (incoming file transfer request)
-    /// Method này được gọi từ background thread (TCP listener)
     /// </summary>
     private async Task<bool> HandleIncomingFileTransferRequestAsync(
         string fileName, 
@@ -471,12 +503,11 @@ public class MainViewModel : BaseViewModel
         string fromPeer, 
         string checksum)
     {
+        // (Không thay đổi)
         bool accepted = false;
         
         try
         {
-            // Phải dùng Dispatcher vì method này được gọi từ background thread
-            // nhưng cần hiển thị MessageBox trên UI thread
             await Application.Current.Dispatcher.InvokeAsync(() =>
             {
                 var result = MessageBox.Show(
@@ -491,7 +522,7 @@ public class MainViewModel : BaseViewModel
                     "File Transfer Request",
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Question,
-                    MessageBoxResult.No); // Default là No để an toàn
+                    MessageBoxResult.No); 
                 
                 accepted = (result == MessageBoxResult.Yes);
                 
@@ -501,7 +532,7 @@ public class MainViewModel : BaseViewModel
         catch (Exception ex)
         {
             _logger.LogError($"Error showing file transfer request dialog: {ex.Message}", ex);
-            accepted = false; // Nếu có lỗi, mặc định reject
+            accepted = false; 
         }
         
         return accepted;
@@ -512,6 +543,7 @@ public class MainViewModel : BaseViewModel
     /// </summary>
     private static string FormatFileSize(long bytes)
     {
+        // (Không thay đổi)
         string[] sizes = { "B", "KB", "MB", "GB", "TB" };
         double len = bytes;
         int order = 0;

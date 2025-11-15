@@ -206,9 +206,30 @@
                                 <DataTemplate>
                                     <Border BorderBrush="#eeeeee"
                                             BorderThickness="0,0,0,1"
-                                            Padding="6">
+                                            Padding="6"
+                                            Background="Transparent">
+                                        
+                                        <!-- Thêm MouseBinding để xử lý Double-click -->
+                                        <Border.InputBindings>
+                                            <MouseBinding MouseAction="LeftDoubleClick"
+                                                          Command="{Binding OpenFileCommand}" />
+                                        </Border.InputBindings>
+                                        
+                                        <!-- Thêm ToolTip và đổi Cursor khi hover -->
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Cursor" Value="Hand" />
+                                                <Setter Property="ToolTip" Value="{Binding FullFilePath}" />
+                                            </Style>
+                                        </Border.Style>
+
                                         <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="📄" Margin="0,0,8,0"/>
+                                            <!-- Thêm Icon (⏫/⏬) -->
+                                            <TextBlock Text="{Binding DirectionIcon}" 
+                                                       Margin="0,0,8,0"
+                                                       FontSize="14"
+                                                       ToolTip="{Binding Direction}"/>
+                                            
                                             <TextBlock Text="{Binding FileName}" 
                                                        FontWeight="SemiBold"/>
                                             <TextBlock Text=" (" Margin="5,0,0,0"/>
