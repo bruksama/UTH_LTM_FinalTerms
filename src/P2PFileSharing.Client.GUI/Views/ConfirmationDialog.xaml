@@ -72,12 +72,6 @@
                             BorderBrush="#E5E7EB"
                             BorderThickness="1">
                         <Grid>
-                            <!-- Thêm Gif  -->
-                            <Image Source="/Assets/dancing-cat.gif"
-                                   Stretch="Uniform"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"
-                                   RenderOptions.BitmapScalingMode="HighQuality"/>
                             <TextBlock Text="⬇"
                                        FontSize="18"
                                        FontWeight="Bold"
