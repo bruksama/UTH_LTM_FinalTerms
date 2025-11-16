@@ -1,10 +1,14 @@
 using System.Collections.ObjectModel;
-using System.IO;
+using System.IO; 
 using System.Windows;
 using System.Windows.Input;
+using P2PFileSharing.Client;
 using P2PFileSharing.Common.Configuration;
 using P2PFileSharing.Common.Infrastructure;
 using P2PFileSharing.Common.Models;
+using P2PFileSharing.Common.Models.Messages;
+using System.Linq;
+using P2PFileSharing.Client.GUI.Services;
 
 namespace P2PFileSharing.Client.GUI.ViewModels;
 
@@ -16,27 +20,31 @@ public class MainViewModel : BaseViewModel
 {
     private readonly ClientConfig _config;
     private readonly ILogger _logger;
+    private readonly IUIService _uiService;
     private PeerClient? _peerClient;
-
     private string _username = string.Empty;
-    private string _serverAddress = "127.0.0.1:5000";
+    private string _serverIpAddress = "127.0.0.1";
+    private int _serverPort = 5000;
     private bool _isConnected;
     private string _connectionStatus = "Disconnected";
     private PeerViewModel? _selectedPeer;
     private bool _isLoading;
 
-    public MainViewModel(ClientConfig config, ILogger logger)
+    public MainViewModel(ClientConfig config, ILogger logger, IUIService uiService)
     {
         _config = config;
         _logger = logger;
+        _uiService = uiService;
         
         Username = config.Username;
-        ServerAddress = $"{config.ServerIpAddress}:{config.ServerPort}";
+        ServerAddress = config.ServerIpAddress;
+        ServerPort = config.ServerPort;
 
         Peers = new ObservableCollection<PeerViewModel>();
         Transfers = new ObservableCollection<TransferViewModel>();
         SharedFiles = new ObservableCollection<SharedFileViewModel>();
-        
+
+        // Initialize commands
         ConnectCommand = new RelayCommand(
             async () => await ConnectAsync(),
             () => !IsConnected && !IsLoading);
@@ -57,20 +65,23 @@ public class MainViewModel : BaseViewModel
             () => AddSharedFile(),
             () => !IsLoading);
     }
-
     #region Properties
+
     public string Username
     {
         get => _username;
         set => SetProperty(ref _username, value);
     }
-
     public string ServerAddress
     {
-        get => _serverAddress;
-        set => SetProperty(ref _serverAddress, value);
+        get => _serverIpAddress;
+        set => SetProperty(ref _serverIpAddress, value);
     }
-
+    public int ServerPort
+    {
+        get => _serverPort;
+        set => SetProperty(ref _serverPort, value);
+    }
     public bool IsConnected
     {
         get => _isConnected;
@@ -115,6 +126,7 @@ public class MainViewModel : BaseViewModel
     #endregion
 
     #region Commands
+    
     public ICommand ConnectCommand { get; }
     public ICommand DisconnectCommand { get; }
     public ICommand RefreshPeersCommand { get; }
@@ -135,24 +147,33 @@ public class MainViewModel : BaseViewModel
 
         try
         {
-            var parts = ServerAddress.Split(':');
-            if (parts.Length != 2 || !int.TryParse(parts[1], out var port))
+            if (string.IsNullOrWhiteSpace(ServerAddress))
             {
                 MessageBox.Show(
-                    "Invalid server address format. Use IP:Port (e.g., 192.168.1.100:5000)",
+                    "Invalid server address (IP). Please enter a valid IP address.",
                     "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
-            _config.ServerIpAddress = parts[0];
-            _config.ServerPort = port;
+            if (ServerPort <= 0 || ServerPort > 65535)
+            {
+                MessageBox.Show(
+                    "Invalid server port. Must be between 1 and 65535.",
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            _config.ServerIpAddress = ServerAddress;
+            _config.ServerPort = ServerPort;
+            
             _config.Username = Username;
 
             _peerClient = new PeerClient(_config, _logger);
             await _peerClient.StartAsync();
-            
+
             _peerClient.SetFileTransferRequestHandler(HandleIncomingFileTransferRequestAsync);
             _peerClient.OnFileReceived += HandleFileReceived; 
+            _peerClient.OnTransferProgress += HandleTransferProgress; // Đăng ký event tiến độ
 
             if (_peerClient.IsRunning)
             {
@@ -195,7 +216,8 @@ public class MainViewModel : BaseViewModel
             if (_peerClient != null)
             {
                 _peerClient.SetFileTransferRequestHandler(null);
-                _peerClient.OnFileReceived -= HandleFileReceived;
+                _peerClient.OnFileReceived -= HandleFileReceived; 
+                _peerClient.OnTransferProgress -= HandleTransferProgress; // Hủy đăng ký event tiến độ
                 
                 await _peerClient.StopAsync();
                 _peerClient = null;
@@ -331,7 +353,7 @@ public class MainViewModel : BaseViewModel
                     var fileInfo = new System.IO.FileInfo(filePath);
                     if (!fileInfo.Exists)
                         continue;
-                    
+
                     var sharedFile = new SharedFile
                     {
                         FileName = fileInfo.Name,
@@ -405,14 +427,15 @@ public class MainViewModel : BaseViewModel
                     continue;
 
                 var fileInfo = new System.IO.FileInfo(filePath);
-                
+
                 var transfer = new TransferViewModel
                 {
                     FileName   = fileInfo.Name,
                     PeerName   = peer.Username,
                     TotalBytes = fileInfo.Length,
-                    Status     = "Sending..."
-
+                    Status     = "Sending...",
+                    Direction = TransferDirection.Send, 
+                    FullFilePath = filePath 
                 };
 
                 Application.Current.Dispatcher.Invoke(() => Transfers.Add(transfer));
@@ -455,24 +478,43 @@ public class MainViewModel : BaseViewModel
                 {
                     fileSize = new FileInfo(fullSavePath).Length;
                 }
-                
+
                 var sharedFile = new SharedFile
                 {
                     FileName = fileName,
-                    FilePath = fullSavePath,
+                    FilePath = fullSavePath, 
                     FileSize = fileSize
                 };
-                
+
                 var vm = new SharedFileViewModel(sharedFile)
                 {
                     Direction = FileDirection.Received 
                 };
 
-                SharedFiles.Add(vm);
+                SharedFiles.Add(vm); 
             }
             catch (Exception ex)
             {
                 _logger.LogError($"Error adding received file to UI: {ex.Message}", ex);
+            }
+        });
+    }
+    
+    /// <summary>
+    /// Xử lý khi tiến độ transfer thay đổi
+    /// </summary>
+    private void HandleTransferProgress(string fileName, long bytesTransferred, long totalBytes, double speedMbPerSecond)
+    {
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            var transferVm = Transfers.FirstOrDefault(t => t.FileName == fileName && !t.IsCompleted);
+
+            if (transferVm != null)
+            {
+                transferVm.BytesTransferred = bytesTransferred;
+                transferVm.TotalBytes = totalBytes;
+                transferVm.Speed = $"{speedMbPerSecond:F2} MB/s";
+                transferVm.Status = "In Progress";
             }
         });
     }
@@ -487,46 +529,27 @@ public class MainViewModel : BaseViewModel
         string fromPeer, 
         string checksum)
     {
-        bool accepted = false;
-        
+        _logger.LogInfo($"Handling incoming file request: {fileName} from {fromPeer}");
+
         try
         {
-            await Application.Current.Dispatcher.InvokeAsync(() =>
-            {
-                var result = MessageBox.Show(
-                    $"Incoming File Transfer Request\n\n" +
-                    $"From: {fromPeer}\n" +
-                    $"File: {fileName}\n" +
-                    $"Size: {FormatFileSize(fileSize)}\n" +
-                    (!string.IsNullOrEmpty(checksum) 
-                        ? $"Checksum: {checksum.Substring(0, Math.Min(16, checksum.Length))}...\n" 
-                        : "") +
-                    $"\nDo you want to accept this file?",
-                    "File Transfer Request",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Question,
-                    MessageBoxResult.No); 
-                
-                accepted = (result == MessageBoxResult.Yes);
-                
-                _logger.LogInfo($"User {(accepted ? "accepted" : "rejected")} file transfer: {fileName} from {fromPeer}");
-            });
+            string formattedSize = FormatFileSize(fileSize);
+            bool accepted = await _uiService.ShowFileTransferRequestAsync(fromPeer, fileName, formattedSize);
+
+            _logger.LogInfo($"User {(accepted ? "accepted" : "rejected")} file transfer: {fileName}");
+            return accepted;
         }
         catch (Exception ex)
         {
-            _logger.LogError($"Error showing file transfer request dialog: {ex.Message}", ex);
-            accepted = false; 
+            _logger.LogError($"Error in ShowFileTransferRequestAsync: {ex.Message}", ex);
+            return false;
         }
-        
-        return accepted;
     }
-
     /// <summary>
     /// Format file size thành dạng dễ đọc (B, KB, MB, GB, TB)
     /// </summary>
     private static string FormatFileSize(long bytes)
     {
-        // (Không thay đổi)
         string[] sizes = { "B", "KB", "MB", "GB", "TB" };
         double len = bytes;
         int order = 0;

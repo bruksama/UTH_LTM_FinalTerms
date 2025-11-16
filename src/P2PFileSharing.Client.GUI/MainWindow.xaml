@@ -222,7 +222,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>   <!-- Header + connect bar -->
             <RowDefinition Height="*"/>      <!-- Main content -->
-            <RowDefinition Height="240"/>    <!-- Transfers -->
+            <RowDefinition Height="200"/>    <!-- Transfers -->
         </Grid.RowDefinitions>
 
         <!--============= DECORATIVE BACKGROUND SHAPES =============-->
@@ -331,9 +331,10 @@
                 Style="{StaticResource ModernPanel}">
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="2*"/>
-                    <ColumnDefinition Width="2*"/>
-                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="2*"/>   <!-- Username -->
+                    <ColumnDefinition Width="2*"/>   <!-- Server address -->
+                    <ColumnDefinition Width="Auto"/> <!-- Port -->
+                    <ColumnDefinition Width="Auto"/> <!-- Buttons -->
                 </Grid.ColumnDefinitions>
 
                 <!-- Username -->
@@ -354,8 +355,18 @@
                     <TextBox Text="{Binding ServerAddress}"/>
                 </StackPanel>
 
+                <!-- Port (mới thêm) -->
+                <StackPanel Grid.Column="2" Margin="0,0,16,0">
+                    <TextBlock Text="Port"
+                               Foreground="{StaticResource SubtleTextBrush}"
+                               FontSize="11"
+                               Margin="0,0,0,2"/>
+                    <TextBox Text="{Binding ServerPort}"
+                             Width="80"/>
+                </StackPanel>
+
                 <!-- Connect Buttons -->
-                <StackPanel Grid.Column="2"
+                <StackPanel Grid.Column="3"
                             Orientation="Horizontal"
                             HorizontalAlignment="Right"
                             VerticalAlignment="Center">
@@ -389,7 +400,7 @@
                         <StackPanel Orientation="Vertical">
                             <TextBlock Text="Online Peers"
                                        Style="{StaticResource SectionTitleTextStyle}" />
-                            <TextBlock Text="Devices detected in your LAN – click a peer to start sharing."
+                            <TextBlock Text="Drag and drop the file into the profile to send it."
                                        Style="{StaticResource SubtleLabelTextStyle}"/>
                         </StackPanel>
 
