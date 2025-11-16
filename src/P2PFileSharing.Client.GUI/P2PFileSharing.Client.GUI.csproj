@@ -16,6 +16,7 @@
 
     <ItemGroup>
       <None Remove="Assets\dancing-cat.gif" />
+      <Resource Include="Assets\dancing-cat.gif" />
     </ItemGroup>
 
 </Project>
