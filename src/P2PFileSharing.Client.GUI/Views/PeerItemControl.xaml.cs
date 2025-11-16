@@ -106,20 +106,18 @@ public partial class PeerItemControl : UserControl
 
     private void SetHighlight()
     {
-        // Nhớ thêm x:Name="DropZoneBorder" cho Border drop zone trong XAML
         if (FindName("DropZoneBorder") is Border border)
         {
-            border.BorderBrush = Brushes.DodgerBlue;
-            border.Background  = new SolidColorBrush(Color.FromArgb(40, 30, 144, 255));
+            border.BorderBrush = (SolidColorBrush)FindResource("DropZoneBorderBrush"); // Màu viền xanh đậm
+            border.Background  = (SolidColorBrush)FindResource("DropZoneBackgroundBrush"); // Màu nền xanh nhạt
         }
     }
-
     private void ResetHighlight()
     {
         if (FindName("DropZoneBorder") is Border border)
         {
-            border.BorderBrush = Brushes.Blue;
-            border.Background  = Brushes.LightBlue;
+            border.ClearValue(Border.BorderBrushProperty);
+            border.ClearValue(Border.BackgroundProperty);
         }
     }
 }
