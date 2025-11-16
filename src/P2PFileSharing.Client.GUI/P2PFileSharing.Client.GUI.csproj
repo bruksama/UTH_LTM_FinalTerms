@@ -14,4 +14,8 @@
         <ProjectReference Include="..\P2PFileSharing.Server\P2PFileSharing.Server.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <None Remove="Assets\dancing-cat.gif" />
+    </ItemGroup>
+
 </Project>
