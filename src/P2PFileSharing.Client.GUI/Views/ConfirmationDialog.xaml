@@ -73,15 +73,13 @@
                             BorderThickness="1">
                         <Grid>
                             <TextBlock Text="⬇"
-                                       FontSize="18"
+                                       FontSize="70"
                                        FontWeight="Bold"
-                                       Foreground="#ffffffCC"
-                                       HorizontalAlignment="Right"
-                                       VerticalAlignment="Bottom"
-                                       Margin="0,4,4,0"/>
+                                       Foreground="DarkBlue"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"/>
                         </Grid>
                     </Border>
-
                     <!-- Text info -->
                     <StackPanel Grid.Column="1"
                                 VerticalAlignment="Center">
