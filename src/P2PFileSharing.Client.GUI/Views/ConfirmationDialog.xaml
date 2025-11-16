@@ -1,0 +1,157 @@
+﻿<UserControl x:Class="P2PFileSharing.Client.GUI.Views.ConfirmationDialog"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             mc:Ignorable="d" 
+             d:DesignHeight="220" d:DesignWidth="460"
+             FontFamily="Segoe UI"
+             MaxWidth="460">
+
+    <Border Style="{StaticResource ModernPanel}" 
+            Background="White"
+            CornerRadius="16"
+            Padding="20"
+            Margin="0">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>    <!-- content -->
+                <RowDefinition Height="Auto"/> <!-- buttons -->
+            </Grid.RowDefinitions>
+
+            <!-- ================= CONTENT ================= -->
+            <Grid Grid.Row="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/> <!-- chip + title -->
+                    <RowDefinition Height="*"/>    <!-- body -->
+                </Grid.RowDefinitions>
+
+                <!-- Top: chip + title -->
+                <StackPanel Grid.Row="0"
+                            Orientation="Horizontal"
+                            Margin="0,0,0,10"
+                            VerticalAlignment="Top">
+                    <!-- Chip: Incoming file -->
+                    <Border Background="#EEF2FF"
+                            CornerRadius="999"
+                            Padding="8,3"
+                            Margin="0,0,8,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📁"
+                                       FontSize="12"
+                                       Margin="0,0,5,0"/>
+                            <TextBlock Text="Incoming file"
+                                       FontSize="11"
+                                       Foreground="{StaticResource PrimaryBrush}"
+                                       FontWeight="SemiBold"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Title -->
+                    <TextBlock x:Name="TitleText"
+                               Text="File transfer request"
+                               Style="{StaticResource SectionTitleTextStyle}"
+                               FontSize="18"
+                               VerticalAlignment="Center"
+                               Margin="4,0,0,0"/>
+                </StackPanel>
+
+                <!-- Main body -->
+                <Grid Grid.Row="1" Margin="0,4,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- ========== CAT GIF ========== -->
+                    <Border Grid.Column="0"
+                            Width="80" Height="80"
+                            CornerRadius="24"
+                            Margin="0,0,16,0"
+                            Background="#F1F5F9"
+                            BorderBrush="#E5E7EB"
+                            BorderThickness="1">
+                        <Grid>
+                            <!-- Thêm Gif  -->
+                            <Image Source="/Assets/dancing-cat.gif"
+                                   Stretch="Uniform"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   RenderOptions.BitmapScalingMode="HighQuality"/>
+                            <TextBlock Text="⬇"
+                                       FontSize="18"
+                                       FontWeight="Bold"
+                                       Foreground="#ffffffCC"
+                                       HorizontalAlignment="Right"
+                                       VerticalAlignment="Bottom"
+                                       Margin="0,4,4,0"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Text info -->
+                    <StackPanel Grid.Column="1"
+                                VerticalAlignment="Center">
+                        <!-- Message chung -->
+                        <TextBlock x:Name="MessageText"
+                                   Text="Do you want to accept this file?"
+                                   FontSize="14"
+                                   Foreground="{StaticResource SubtleTextBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,10"/>
+
+                        <!-- Info chi tiết: có thể set text từ code-behind -->
+                        <StackPanel>
+                            <TextBlock x:Name="FromText"
+                                       Text="From: PeerName"
+                                       FontSize="13"
+                                       Foreground="{StaticResource HeaderTextBrush}"
+                                       Margin="0,2,0,0"/>
+                            <TextBlock x:Name="FileNameText"
+                                       Text="File: example.zip"
+                                       FontSize="13"
+                                       Foreground="{StaticResource SubtleTextBrush}"
+                                       Margin="0,2,0,0"/>
+                            <TextBlock x:Name="FileSizeText"
+                                       Text="Size: 12.4 MB"
+                                       FontSize="12"
+                                       Foreground="{StaticResource SubtleTextBrush}"
+                                       Margin="0,2,0,0"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+            </Grid>
+
+            <!-- ================= BUTTONS ================= -->
+            <StackPanel Grid.Row="1"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Margin="0,18,0,0">
+
+                <!-- Cancel / No -->
+                <Button x:Name="NoButton"
+                        Content="Decline"
+                        Style="{StaticResource ModernButton}"
+                        MinWidth="110"
+                        Click="NoButton_Click">
+                    <Button.Background>
+                        <SolidColorBrush Color="#F1F5F9" />
+                    </Button.Background>
+                    <Button.Foreground>
+                        <SolidColorBrush Color="#475569" />
+                    </Button.Foreground>
+                    <Button.Effect>
+                        <DropShadowEffect BlurRadius="0" Opacity="0"/>
+                    </Button.Effect>
+                </Button>
+
+                <!-- Accept / Yes -->
+                <Button x:Name="YesButton"
+                        Content="Accept"
+                        Style="{StaticResource ModernButton}"
+                        MinWidth="110"
+                        Margin="10,0,0,0"
+                        Click="YesButton_Click"/>
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

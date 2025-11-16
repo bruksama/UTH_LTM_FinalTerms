@@ -8,6 +8,7 @@ using P2PFileSharing.Common.Infrastructure;
 using P2PFileSharing.Common.Models;
 using P2PFileSharing.Common.Models.Messages;
 using System.Linq;
+using P2PFileSharing.Client.GUI.Services;
 
 namespace P2PFileSharing.Client.GUI.ViewModels;
 
@@ -19,6 +20,7 @@ public class MainViewModel : BaseViewModel
 {
     private readonly ClientConfig _config;
     private readonly ILogger _logger;
+    private readonly IUIService _uiService;
     private PeerClient? _peerClient;
     private string _username = string.Empty;
     private string _serverIpAddress = "127.0.0.1";
@@ -28,17 +30,15 @@ public class MainViewModel : BaseViewModel
     private PeerViewModel? _selectedPeer;
     private bool _isLoading;
 
-    public MainViewModel(ClientConfig config, ILogger logger)
+    public MainViewModel(ClientConfig config, ILogger logger, IUIService uiService)
     {
         _config = config;
         _logger = logger;
-
-        // Initialize từ config
-        Username = config.Username;
+        _uiService = uiService;
         
+        Username = config.Username;
         ServerAddress = config.ServerIpAddress;
         ServerPort = config.ServerPort;
-        // =====================================================
 
         Peers = new ObservableCollection<PeerViewModel>();
         Transfers = new ObservableCollection<TransferViewModel>();
@@ -65,7 +65,6 @@ public class MainViewModel : BaseViewModel
             () => AddSharedFile(),
             () => !IsLoading);
     }
-
     #region Properties
 
     public string Username
@@ -530,40 +529,22 @@ public class MainViewModel : BaseViewModel
         string fromPeer, 
         string checksum)
     {
-        bool accepted = false;
-        
+        _logger.LogInfo($"Handling incoming file request: {fileName} from {fromPeer}");
+
         try
         {
-            await Application.Current.Dispatcher.InvokeAsync(() =>
-            {
-                var result = MessageBox.Show(
-                    $"Incoming File Transfer Request\n\n" +
-                    $"From: {fromPeer}\n" +
-                    $"File: {fileName}\n" +
-                    $"Size: {FormatFileSize(fileSize)}\n" +
-                    (!string.IsNullOrEmpty(checksum) 
-                        ? $"Checksum: {checksum.Substring(0, Math.Min(16, checksum.Length))}...\n" 
-                        : "") +
-                    $"\nDo you want to accept this file?",
-                    "File Transfer Request",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Question,
-                    MessageBoxResult.No); 
-                
-                accepted = (result == MessageBoxResult.Yes);
-                
-                _logger.LogInfo($"User {(accepted ? "accepted" : "rejected")} file transfer: {fileName} from {fromPeer}");
-            });
+            string formattedSize = FormatFileSize(fileSize);
+            bool accepted = await _uiService.ShowFileTransferRequestAsync(fromPeer, fileName, formattedSize);
+
+            _logger.LogInfo($"User {(accepted ? "accepted" : "rejected")} file transfer: {fileName}");
+            return accepted;
         }
         catch (Exception ex)
         {
-            _logger.LogError($"Error showing file transfer request dialog: {ex.Message}", ex);
-            accepted = false; 
+            _logger.LogError($"Error in ShowFileTransferRequestAsync: {ex.Message}", ex);
+            return false;
         }
-        
-        return accepted;
     }
-
     /// <summary>
     /// Format file size thành dạng dễ đọc (B, KB, MB, GB, TB)
     /// </summary>
