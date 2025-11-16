@@ -7,7 +7,7 @@ using P2PFileSharing.Common.Configuration;
 using P2PFileSharing.Common.Infrastructure;
 using P2PFileSharing.Common.Models;
 using P2PFileSharing.Common.Models.Messages;
-using System.Linq; // Thêm 'using' này
+using System.Linq;
 
 namespace P2PFileSharing.Client.GUI.ViewModels;
 
@@ -20,9 +20,9 @@ public class MainViewModel : BaseViewModel
     private readonly ClientConfig _config;
     private readonly ILogger _logger;
     private PeerClient? _peerClient;
-
     private string _username = string.Empty;
-    private string _serverAddress = "127.0.0.1:5000";
+    private string _serverIpAddress = "127.0.0.1";
+    private int _serverPort = 5000;
     private bool _isConnected;
     private string _connectionStatus = "Disconnected";
     private PeerViewModel? _selectedPeer;
@@ -35,7 +35,10 @@ public class MainViewModel : BaseViewModel
 
         // Initialize từ config
         Username = config.Username;
-        ServerAddress = $"{config.ServerIpAddress}:{config.ServerPort}";
+        
+        ServerAddress = config.ServerIpAddress;
+        ServerPort = config.ServerPort;
+        // =====================================================
 
         Peers = new ObservableCollection<PeerViewModel>();
         Transfers = new ObservableCollection<TransferViewModel>();
@@ -70,13 +73,16 @@ public class MainViewModel : BaseViewModel
         get => _username;
         set => SetProperty(ref _username, value);
     }
-
     public string ServerAddress
     {
-        get => _serverAddress;
-        set => SetProperty(ref _serverAddress, value);
+        get => _serverIpAddress;
+        set => SetProperty(ref _serverIpAddress, value);
     }
-
+    public int ServerPort
+    {
+        get => _serverPort;
+        set => SetProperty(ref _serverPort, value);
+    }
     public bool IsConnected
     {
         get => _isConnected;
@@ -142,23 +148,30 @@ public class MainViewModel : BaseViewModel
 
         try
         {
-            var parts = ServerAddress.Split(':');
-            if (parts.Length != 2 || !int.TryParse(parts[1], out var port))
+            if (string.IsNullOrWhiteSpace(ServerAddress))
             {
                 MessageBox.Show(
-                    "Invalid server address format. Use IP:Port (e.g., 192.168.1.100:5000)",
+                    "Invalid server address (IP). Please enter a valid IP address.",
                     "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
-            _config.ServerIpAddress = parts[0];
-            _config.ServerPort = port;
+            if (ServerPort <= 0 || ServerPort > 65535)
+            {
+                MessageBox.Show(
+                    "Invalid server port. Must be between 1 and 65535.",
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            _config.ServerIpAddress = ServerAddress;
+            _config.ServerPort = ServerPort;
+            
             _config.Username = Username;
 
             _peerClient = new PeerClient(_config, _logger);
             await _peerClient.StartAsync();
-            
-            // Đăng ký các handler
+
             _peerClient.SetFileTransferRequestHandler(HandleIncomingFileTransferRequestAsync);
             _peerClient.OnFileReceived += HandleFileReceived; 
             _peerClient.OnTransferProgress += HandleTransferProgress; // Đăng ký event tiến độ
@@ -455,7 +468,6 @@ public class MainViewModel : BaseViewModel
     /// </summary>
     public void HandleFileReceived(string fileName, string fullSavePath, string fromPeer)
     {
-        // Thêm file đã nhận vào danh sách "Shared Files" (bên phải)
         Application.Current.Dispatcher.Invoke(() =>
         {
             try
@@ -496,8 +508,6 @@ public class MainViewModel : BaseViewModel
     {
         Application.Current.Dispatcher.Invoke(() =>
         {
-            // Tìm TransferViewModel tương ứng trong danh sách "File Transfers" (bên dưới)
-            // (Giả sử fileName là duy nhất trong danh sách đang transfer)
             var transferVm = Transfers.FirstOrDefault(t => t.FileName == fileName && !t.IsCompleted);
 
             if (transferVm != null)
