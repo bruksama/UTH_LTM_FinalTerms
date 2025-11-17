@@ -76,8 +76,6 @@ public class RegistryServer
             using (var stream = tcpClient.GetStream())
             {
                 await MessageHandler.HandleMessagesAsync(stream, _peerRegistry, _logger);
-                // TODO: Implement message handling using MessageHandler
-                // await MessageHandler.HandleMessagesAsync(stream, _peerRegistry, _logger);
             }
         }
         catch (IOException ioex)

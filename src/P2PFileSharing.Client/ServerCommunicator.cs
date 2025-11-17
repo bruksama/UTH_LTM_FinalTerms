@@ -7,7 +7,6 @@ namespace P2PFileSharing.Client;
 
 /// <summary>
 /// Giao tiếp với Registry Server
-/// TODO: Implement client-server communication (FR-01, FR-03, FR-09)
 /// </summary>
 public class ServerCommunicator
 {
@@ -64,11 +63,11 @@ public class ServerCommunicator
                     ? $"Connection timeout after {timeoutMs}ms"
                     : "Connection failed";
                 _logger.LogInfo($"Register: {errorMsg} - Cannot connect to server {_config.ServerIpAddress}:{_config.ServerPort}");
-                _logger.LogInfo($"  Hãy kiểm tra:");
-                _logger.LogInfo($"  1. Server đã được khởi động chưa?");
-                _logger.LogInfo($"  2. IP address và port có đúng không?");
-                _logger.LogInfo($"  3. Firewall có chặn kết nối không?");
-                _logger.LogInfo($"  4. Cả hai máy có cùng mạng LAN không?");
+                _logger.LogInfo($"  Please check");
+                _logger.LogInfo($"  1. Is the server running?");
+                _logger.LogInfo($"  2. Is the IP address and port correct?");
+                _logger.LogInfo($"  3. Could a firewall be blocking the connection?");
+                _logger.LogInfo($"  4. Are both machines on the same LAN?");
                 return false;
             }
 

@@ -6,14 +6,12 @@ namespace P2PFileSharing.Client.GUI.Services;
 
 /// <summary>
 /// Service để quản lý PeerClient instance và cung cấp interface cho ViewModel
-/// TODO: Implement wrapper around PeerClient to expose functionality to ViewModels
 /// </summary>
 public class PeerClientService
 {
     private readonly ClientConfig _config;
     private readonly ILogger _logger;
-    // TODO: Add PeerClient instance when Client project is ready
-    // private PeerClient? _peerClient;
+    private PeerClient? _peerClient;
 
     public PeerClientService(ClientConfig config, ILogger logger)
     {
@@ -23,74 +21,91 @@ public class PeerClientService
 
     /// <summary>
     /// Khởi động PeerClient và đăng ký với Server
-    /// TODO: Create PeerClient instance
-    /// TODO: Call PeerClient.StartAsync()
-    /// TODO: Return success/failure
     /// </summary>
     public async Task<bool> StartAsync(PeerInfo peerInfo)
     {
-        // TODO: Create PeerClient instance
-        // TODO: Call StartAsync()
-        // TODO: Return result
-        await Task.CompletedTask;
-        return false;
+        try
+        {
+            if (_peerClient?.IsRunning == true)
+            {
+                return true;
+            }
+
+            // Đồng bộ lại cấu hình dựa trên peer info được cung cấp từ UI
+            if (!string.IsNullOrWhiteSpace(peerInfo.Username))
+            {
+                _config.Username = peerInfo.Username;
+            }
+
+            if (peerInfo.ListenPort > 0)
+            {
+                _config.ListenPort = peerInfo.ListenPort;
+            }
+
+            _peerClient = EnsureClient();
+            await _peerClient.StartAsync();
+
+            return _peerClient.IsRunning;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Failed to start PeerClient: {ex.Message}", ex);
+            return false;
+        }
+        
     }
 
     /// <summary>
     /// Dừng PeerClient và hủy đăng ký
-    /// TODO: Call PeerClient.StopAsync()
     /// </summary>
     public async Task StopAsync()
     {
-        // TODO: Call PeerClient.StopAsync() if exists
-        await Task.CompletedTask;
+        if (_peerClient != null)
+        {
+            await _peerClient.StopAsync();
+        }
     }
 
     /// <summary>
     /// Query danh sách peer từ Server
-    /// TODO: Call ServerCommunicator.QueryPeersAsync()
     /// </summary>
     public async Task<List<PeerInfo>> QueryPeersAsync(string? fileNameFilter = null)
     {
-        // TODO: Call ServerCommunicator.QueryPeersAsync()
-        await Task.CompletedTask;
-        return new List<PeerInfo>();
+        var client = EnsureClient();
+        return await client.QueryPeersAsync(fileNameFilter);
     }
 
     /// <summary>
     /// Scan mạng LAN bằng UDP broadcast
-    /// TODO: Call UdpDiscovery.ScanNetworkAsync()
     /// </summary>
     public async Task<List<PeerInfo>> ScanNetworkAsync()
     {
-        // TODO: Call UdpDiscovery.ScanNetworkAsync()
-        await Task.CompletedTask;
-        return new List<PeerInfo>();
+        var client = EnsureClient();
+        return await client.ScanLanAsync();
     }
 
     /// <summary>
     /// Gửi file đến peer
-    /// TODO: Call FileTransferManager.SendFileAsync()
-    /// TODO: Return transfer progress observable
     /// </summary>
     public async Task<bool> SendFileAsync(string peerIpAddress, int peerPort, string filePath)
     {
-        // TODO: Call FileTransferManager.SendFileAsync()
-        await Task.CompletedTask;
-        return false;
+        var client = EnsureClient();
+        return await client.SendFileAsync($"{peerIpAddress}:{peerPort}", filePath);
     }
 
     /// <summary>
     /// Kiểm tra xem PeerClient có đang chạy không
-    /// TODO: Check PeerClient.IsRunning
     /// </summary>
     public bool IsRunning
     {
         get
         {
-            // TODO: Return _peerClient?.IsRunning ?? false
-            return false;
+            return _peerClient?.IsRunning ?? false;
         }
+    }
+    private PeerClient EnsureClient()
+    {
+        return _peerClient ??= new PeerClient(_config, _logger);
     }
 }
 

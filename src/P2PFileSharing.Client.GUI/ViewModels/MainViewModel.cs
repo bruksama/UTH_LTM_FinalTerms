@@ -2,7 +2,6 @@ using System.Collections.ObjectModel;
 using System.IO; 
 using System.Windows;
 using System.Windows.Input;
-using P2PFileSharing.Client;
 using P2PFileSharing.Common.Configuration;
 using P2PFileSharing.Common.Infrastructure;
 using P2PFileSharing.Common.Models;
