@@ -4,7 +4,6 @@ namespace P2PFileSharing.Client.GUI.ViewModels;
 
 /// <summary>
 /// Simple RelayCommand implementation for ICommand
-/// TODO: Implement CanExecuteChanged event if needed for dynamic enabling/disabling
 /// </summary>
 public class RelayCommand : ICommand
 {

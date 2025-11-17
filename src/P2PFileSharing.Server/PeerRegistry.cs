@@ -12,7 +12,6 @@ namespace P2PFileSharing.Server;
 
 /// <summary>
 /// Quản lý danh sách peers đang online
-/// TODO: Implement register, query, deregister, timeout logic
 /// </summary>
 public class PeerRegistry
 {
@@ -35,12 +34,6 @@ public class PeerRegistry
     /// </summary>
     public bool RegisterPeer(PeerInfo peerInfo)
     {
-
-        // TODO: Implement registration logic
-        // - Validate peer info
-        // - Check max peers limit
-        // - Add/update peer in dictionary
-        // - Log registration
         if (peerInfo is null)
         {
             _logger.LogInfo("RegisterPeer: peerInfo is null");

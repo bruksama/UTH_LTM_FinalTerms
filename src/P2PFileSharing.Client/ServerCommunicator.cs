@@ -7,7 +7,6 @@ namespace P2PFileSharing.Client;
 
 /// <summary>
 /// Giao tiếp với Registry Server
-/// TODO: Implement client-server communication (FR-01, FR-03, FR-09)
 /// </summary>
 public class ServerCommunicator
 {
