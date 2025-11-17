@@ -206,7 +206,7 @@
                         <StackPanel Orientation="Vertical">
                             <TextBlock Text="Online Peers"
                                        Style="{StaticResource SectionTitleTextStyle}" />
-                            <TextBlock Text="Drag and drop the file into the profile to send it."
+                            <TextBlock Text="Drag and drop a file or click a peer to choose files to send."
                                        Style="{StaticResource SubtleLabelTextStyle}"/>
                         </StackPanel>
 
