@@ -40,11 +40,11 @@ Project sử dụng MVVM pattern để tách biệt UI và business logic:
 - ✅ View skeletons với TODO comments
 
 ### Cần implement
-- ⏳ MainWindow layout với connection panel
-- ⏳ Peer list với drag & drop
-- ⏳ File transfer progress tracking
-- ⏳ Integration với PeerClient business logic
-- ⏳ Error handling và notifications
+- ✅ MainWindow layout với connection panel
+- ✅ Peer list với drag & drop
+- ✅ File transfer progress tracking
+- ✅ Integration với PeerClient business logic
+- ✅ Error handling và notifications
 
 ## Drag & Drop Flow
 
