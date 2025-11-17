@@ -1,5 +1,4 @@
 using P2PFileSharing.Common.Models;
-using System;
 using System.Diagnostics;
 using System.Windows.Input;
 

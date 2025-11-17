@@ -7,7 +7,6 @@ namespace P2PFileSharing.Server;
 
 /// <summary>
 /// Xử lý các message từ clients
-/// TODO: Implement message parsing và handling logic
 /// </summary>
 public static class MessageHandler
 {
@@ -92,7 +91,6 @@ public static class MessageHandler
 
     private static async Task<Message?> HandleQueryAsync(QueryMessage message, PeerRegistry peerRegistry, ILogger logger)
     {
-        // TODO: Implement query logic
         await Task.Yield();
 
         var peers = string.IsNullOrWhiteSpace(message.FileNameFilter)
@@ -107,7 +105,6 @@ public static class MessageHandler
 
     private static async Task<Message?> HandleDeregisterAsync(DeregisterMessage message, PeerRegistry peerRegistry, ILogger logger)
     {
-        // TODO: Implement deregistration logic
         await Task.Yield();
 
         // Registry key là Username; message mang PeerId → map PeerId -> Username
@@ -125,7 +122,6 @@ public static class MessageHandler
 
     private static async Task<Message?> HandleHeartbeatAsync(HeartbeatMessage message, PeerRegistry peerRegistry, ILogger logger)
     {
-        // TODO: Update heartbeat
         await Task.Yield();
 
         var username = FindUsernameByPeerId(peerRegistry, message.PeerId);
