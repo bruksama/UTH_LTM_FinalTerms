@@ -50,6 +50,7 @@
             CornerRadius="14"
             BorderThickness="1"
             AllowDrop="True"
+            Cursor="Hand"
             SnapsToDevicePixels="True">
         <Border.Effect>
             <DropShadowEffect Color="#90A4AE"

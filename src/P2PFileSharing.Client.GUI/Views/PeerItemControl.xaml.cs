@@ -1,7 +1,8 @@
-using System;
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Controls;
 using System.Windows.Media;
+using Microsoft.Win32;
 using P2PFileSharing.Client.GUI.ViewModels;
 
 namespace P2PFileSharing.Client.GUI.Views;
@@ -23,6 +24,7 @@ public partial class PeerItemControl : UserControl
         DragLeave += OnDragLeave;
         DragOver  += OnDragOver;
         Drop      += OnDrop;
+        MouseLeftButtonUp += OnMouseLeftButtonUp;
     }
 
     /// <summary>
@@ -118,6 +120,42 @@ public partial class PeerItemControl : UserControl
         {
             border.ClearValue(Border.BorderBrushProperty);
             border.ClearValue(Border.BackgroundProperty);
+        }
+    }
+
+    /// <summary>
+    /// Cho phép click vào peer để mở file picker và gửi file
+    /// </summary>
+    private async void OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        try
+        {
+            if (DataContext is not PeerViewModel peerVm)
+                return;
+
+            if (Application.Current.MainWindow?.DataContext is not MainViewModel mainVm)
+                return;
+
+            var dialog = new OpenFileDialog
+            {
+                Title = $"Select files to send to {peerVm.Username}",
+                Multiselect = true,
+                Filter = "All Files|*.*"
+            };
+
+            if (dialog.ShowDialog() == true && dialog.FileNames.Length > 0)
+            {
+                await mainVm.HandleFileDropAsync(peerVm, dialog.FileNames);
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error selecting files: {ex.Message}",
+                "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            e.Handled = true;
         }
     }
 }
