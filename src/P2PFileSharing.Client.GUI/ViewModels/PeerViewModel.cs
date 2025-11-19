@@ -11,12 +11,14 @@ namespace P2PFileSharing.Client.GUI.ViewModels;
 public class PeerViewModel : BaseViewModel
 {
     private readonly PeerInfo _peerInfo;
+    private readonly Func<string, Task<bool>>? _sendFileFunc;
     private bool _isOnline;
     private string _status = "Online";
     
-    public PeerViewModel(PeerInfo peerInfo)
+    public PeerViewModel(PeerInfo peerInfo, Func<string, Task<bool>>? sendFileFunc = null)
     {
         _peerInfo = peerInfo;
+        _sendFileFunc = sendFileFunc;
         SharedFiles = new ObservableCollection<SharedFileViewModel>();
 
         // Khởi tạo SharedFiles từ PeerInfo.SharedFiles
@@ -87,7 +89,6 @@ public class PeerViewModel : BaseViewModel
 
     /// <summary>
     /// Gửi file đến peer này
-    /// TODO: tích hợp FileTransferManager.SendFileAsync(...) thực tế
     /// </summary>
     public async Task<bool> SendFileAsync(string filePath)
     {
@@ -96,11 +97,14 @@ public class PeerViewModel : BaseViewModel
             if (!System.IO.File.Exists(filePath))
                 return false;
 
-            // TODO: Call FileTransferManager.SendFileAsync(_peerInfo.IpAddress, _peerInfo.ListenPort, filePath)
-            // Hiện tại mô phỏng transfer cho mục đích test GUI
-            await Task.Delay(1000);
+            if (_sendFileFunc == null)
+                return false;
 
-            return true; // Placeholder: sau này trả về kết quả thực
+            Status = "Sending...";
+            var success = await _sendFileFunc(filePath);
+            Status = success ? "Sent" : "Send failed";
+
+            return success;
         }
         catch
         {

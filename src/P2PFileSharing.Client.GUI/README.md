@@ -33,11 +33,10 @@ Project sử dụng MVVM pattern để tách biệt UI và business logic:
 
 ## Tính năng chính
 
-### Đã hoàn thành (Skeleton)
+### Đã hoàn thành
 - ✅ Cấu trúc MVVM
 - ✅ Base ViewModels với INotifyPropertyChanged
 - ✅ RelayCommand implementation
-- ✅ View skeletons với TODO comments
 
 ### Cần implement
 - ✅ MainWindow layout với connection panel
