@@ -6,20 +6,24 @@ WPF Desktop Application cho P2P File Sharing với tính năng Drag & Drop.
 
 ```
 P2PFileSharing.Client.GUI/
-├── Views/                    # WPF Views (XAML)
-│   ├── MainWindow.xaml       # Main window layout
-│   ├── PeerItemControl.xaml  # Peer item với drag & drop zone
-│   └── TransferItemControl.xaml  # Transfer progress display
-├── ViewModels/               # MVVM ViewModels
+├── App.xaml                  # Application resources
+├── MainWindow.xaml           # Main window layout
+├── Views/                    # User controls & dialog shells
+│   ├── ConfirmationDialog.*  # Hộp thoại xác nhận tái sử dụng
+│   ├── DialogShell.*         # Window shell để host dialog
+│   ├── PeerItemControl.*     # Drag & drop zone cho peer
+│   └── TransferItemControl.* # Hiển thị tiến trình truyền file
+├── ViewModels/               # MVVM ViewModels & helpers
 │   ├── BaseViewModel.cs      # Base class với INotifyPropertyChanged
-│   ├── MainViewModel.cs      # Main window ViewModel
-│   ├── PeerViewModel.cs      # Peer item ViewModel
-│   ├── SharedFileViewModel.cs # Shared file ViewModel
-│   ├── TransferViewModel.cs  # Transfer progress ViewModel
-│   └── RelayCommand.cs       # ICommand implementation
-└── Services/                 # Business logic services
-    ├── PeerClientService.cs  # Wrapper around PeerClient
-    └── UIService.cs          # UI dialogs và notifications
+│   ├── MainViewModel.cs      # ViewModel cho MainWindow
+│   ├── PeerViewModel.cs      # ViewModel cho từng peer
+│   ├── SharedFileViewModel.cs # ViewModel cho file chia sẻ
+│   ├── TransferViewModel.cs  # ViewModel cho tiến trình truyền file
+│   └── RelayCommand.cs       # ICommand implementation dùng cho binding
+└── Services/                 # UI & network service wrappers
+    ├── IUIService.cs         # Contract cho UI interactions (dialogs/toasts)
+    ├── WpfUIService.cs       # Triển khai UIService cho WPF
+    └── PeerClientService.cs  # Wrapper cho PeerClient logic
 ```
 
 ## Kiến trúc MVVM
