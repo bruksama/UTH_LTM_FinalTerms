@@ -127,7 +127,7 @@ dotnet test
 
 ## Tài liệu
 
-Xem file `srs.md` để biết chi tiết về đặc tả yêu cầu phần mềm.
+Xem thêm thông tin ở `docs/` để biết chi tiết về đặc tả yêu cầu phần mềm.
 
 ## License
 
